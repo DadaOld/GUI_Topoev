@@ -4,12 +4,8 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="d210338a-96af-45c6-af8b-90215dcaf457" name="Changes" comment="Пермещение скриншота в папку Screenshots">
-      <change afterPath="$PROJECT_DIR$/Screenshots/stage2_edit_items.png" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/Screenshots/stage2_file_items.png" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/Screenshots/stage2_save_file.png" afterDir="false" />
+    <list default="true" id="d210338a-96af-45c6-af8b-90215dcaf457" name="Changes" comment="Реализация меню &quot;Файл&quot; и &quot;Правка&quot;.">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/README.md" beforeDir="false" afterPath="$PROJECT_DIR$/README.md" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/main.py" beforeDir="false" afterPath="$PROJECT_DIR$/main.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
@@ -131,7 +127,15 @@
       <option name="project" value="LOCAL" />
       <updated>1772033054597</updated>
     </task>
-    <option name="localTasksCounter" value="4" />
+    <task id="LOCAL-00004" summary="Реализация меню &quot;Файл&quot; и &quot;Правка&quot;.">
+      <option name="closed" value="true" />
+      <created>1772039073356</created>
+      <option name="number" value="00004" />
+      <option name="presentableId" value="LOCAL-00004" />
+      <option name="project" value="LOCAL" />
+      <updated>1772039073357</updated>
+    </task>
+    <option name="localTasksCounter" value="5" />
     <servers />
   </component>
   <component name="Vcs.Log.Tabs.Properties">
@@ -149,6 +153,7 @@
     <MESSAGE value="Первый этап реализации (базовый интерфейс)" />
     <MESSAGE value="Первое заполнение файла README" />
     <MESSAGE value="Пермещение скриншота в папку Screenshots" />
-    <option name="LAST_COMMIT_MESSAGE" value="Пермещение скриншота в папку Screenshots" />
+    <MESSAGE value="Реализация меню &quot;Файл&quot; и &quot;Правка&quot;." />
+    <option name="LAST_COMMIT_MESSAGE" value="Реализация меню &quot;Файл&quot; и &quot;Правка&quot;." />
   </component>
 </project>
