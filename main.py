@@ -2,7 +2,8 @@ import sys
 import os
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QTextEdit, QVBoxLayout, QWidget,
-    QMenu, QToolBar, QFileDialog, QMessageBox, QSplitter
+    QMenu, QToolBar, QFileDialog, QMessageBox, QSplitter, QDialog,
+    QLabel, QDialogButtonBox
 )
 from PyQt6.QtGui import QAction, QIcon
 from PyQt6.QtCore import Qt, QSize
@@ -15,25 +16,32 @@ class TextEditor(QMainWindow):
         self.init_ui()
 
     def init_ui(self):
-        self.setWindowTitle("Лабораторная работа 1. Текстовый редактор")
-        self.setGeometry(100, 100, 1000, 600)
+        self.setWindowTitle("Лабораторная работа 1. Текстовый редактор [*]")
+        self.setGeometry(100, 100, 1200, 700)
 
         # Центральный виджет
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
         layout = QVBoxLayout(central_widget)
+        layout.setContentsMargins(0, 0, 0, 0)
 
-        # Разделитель
+        # Разделитель для двух областей
         splitter = QSplitter(Qt.Orientation.Vertical)
+
+        # Область редактирования
         self.editor = QTextEdit()
         self.editor.setPlaceholderText("Область ввода текста...")
+        # Отслеживаем изменения для звездочки в заголовке
+        self.editor.document().modificationChanged.connect(self.setWindowModified)
+
+        # Область вывода
         self.output_area = QTextEdit()
         self.output_area.setPlaceholderText("Область вывода результатов...")
         self.output_area.setReadOnly(True)
 
         splitter.addWidget(self.editor)
         splitter.addWidget(self.output_area)
-        splitter.setSizes([400, 200])
+        splitter.setSizes([500, 200])
         layout.addWidget(splitter)
 
         # Создаем меню
@@ -42,10 +50,13 @@ class TextEditor(QMainWindow):
         # Создаем панель инструментов
         self.create_toolbar()
 
+        # Строка состояния
+        self.statusBar().showMessage("Готов к работе")
+
     def create_menus(self):
         menubar = self.menuBar()
 
-        # Файл
+        # Меню файл
         file_menu = menubar.addMenu("Файл")
 
         self.new_action = QAction("Создать", self)
@@ -75,7 +86,7 @@ class TextEditor(QMainWindow):
         exit_action.triggered.connect(self.close)
         file_menu.addAction(exit_action)
 
-        # Правка
+        # Меню правка
         edit_menu = menubar.addMenu("Правка")
 
         self.undo_action = QAction("Отменить", self)
@@ -117,23 +128,35 @@ class TextEditor(QMainWindow):
         select_all_action.triggered.connect(self.editor.selectAll)
         edit_menu.addAction(select_all_action)
 
-        # Текст (пустое)
+        # Меню текст
         text_menu = menubar.addMenu("Текст")
-        text_info_action = QAction("Информация", self)
-        text_info_action.triggered.connect(self.show_text_info)
-        text_menu.addAction(text_info_action)
 
-        # Пуск
+        text_items = [
+            "Постановка задачи",
+            "Грамматика",
+            "Классификация грамматики",
+            "Метод анализа",
+            "Тестовый пример",
+            "Список литературы",
+            "Исходный код программы"
+        ]
+
+        for item_text in text_items:
+            action = QAction(item_text, self)
+            action.triggered.connect(lambda checked, text=item_text: self.show_text_info(text))
+            text_menu.addAction(action)
+
+        # Меню пуск
         run_menu = menubar.addMenu("Пуск")
-        run_menu_action = QAction("Запуск анализатора", self)
-        run_menu_action.setShortcut("F5")
-        run_menu_action.triggered.connect(self.run_placeholder)
-        run_menu.addAction(run_menu_action)
+        self.run_action = QAction("Запуск анализатора", self)
+        self.run_action.setShortcut("F5")
+        self.run_action.triggered.connect(self.run_analyzer)
+        run_menu.addAction(self.run_action)
 
-        # Справка
+        # Меню справка
         help_menu = menubar.addMenu("Справка")
 
-        self.help_action = QAction("Справка", self)
+        self.help_action = QAction("Вызов справки", self)
         self.help_action.setShortcut("F1")
         self.help_action.triggered.connect(self.show_help)
         help_menu.addAction(self.help_action)
@@ -155,8 +178,7 @@ class TextEditor(QMainWindow):
                 return QIcon(icon_path)
             return QIcon()
 
-        # СОЗДАЕМ ОТДЕЛЬНЫЕ ДЕЙСТВИЯ ДЛЯ ТУЛБАРА
-        # Они связаны с теми же функциями, но имеют свои иконки
+        # Создаем отдельные действия для тулбара с иконками
 
         # Создать
         new_tb = QAction(load_icon("new.png"), "Создать", self)
@@ -206,7 +228,7 @@ class TextEditor(QMainWindow):
 
         # Пуск
         run_tb = QAction(load_icon("run.png"), "Пуск", self)
-        run_tb.triggered.connect(self.run_placeholder)
+        run_tb.triggered.connect(self.run_analyzer)
         toolbar.addAction(run_tb)
 
         toolbar.addSeparator()
@@ -223,23 +245,30 @@ class TextEditor(QMainWindow):
 
     # Методы для работы с файлами
     def new_file(self):
-        self.editor.clear()
-        self.current_file = None
-        self.setWindowTitle("Лабораторная работа 1. Текстовый редактор")
+        if self.maybe_save():
+            self.editor.clear()
+            self.current_file = None
+            self.setWindowTitle("Лабораторная работа 1. Текстовый редактор [*]")
+            self.setWindowModified(False)
+            self.statusBar().showMessage("Новый файл создан")
 
     def open_file(self):
-        file_path, _ = QFileDialog.getOpenFileName(
-            self, "Открыть файл", "", "Текстовые файлы (*.txt);;Все файлы (*.*)"
-        )
-        if file_path:
-            try:
-                with open(file_path, 'r', encoding='utf-8') as f:
-                    content = f.read()
-                self.editor.setPlainText(content)
-                self.current_file = file_path
-                self.setWindowTitle(f"{os.path.basename(file_path)} - Лабораторная работа 1. Текстовый редактор")
-            except Exception as e:
-                print(f"Ошибка: {e}")
+        if self.maybe_save():
+            file_path, _ = QFileDialog.getOpenFileName(
+                self, "Открыть файл", "", "Текстовые файлы (*.txt);;Все файлы (*.*)"
+            )
+            if file_path:
+                try:
+                    with open(file_path, 'r', encoding='utf-8') as f:
+                        content = f.read()
+                    self.editor.setPlainText(content)
+                    self.current_file = file_path
+                    self.setWindowTitle(f"{os.path.basename(file_path)} - Лабораторная работа 1. Текстовый редактор[*]")
+                    self.setWindowModified(False)
+                    self.statusBar().showMessage(f"Файл загружен: {file_path}")
+                    self.output_area.append(f"# Файл загружен: {file_path}\n")
+                except Exception as e:
+                    QMessageBox.critical(self, "Ошибка", f"Не удалось открыть файл:\n{e}")
 
     def save_file(self):
         if self.current_file:
@@ -253,42 +282,114 @@ class TextEditor(QMainWindow):
         )
         if file_path:
             self._save_to_file(file_path)
+            return True
+        return False
 
     def _save_to_file(self, file_path):
         try:
             with open(file_path, 'w', encoding='utf-8') as f:
                 f.write(self.editor.toPlainText())
             self.current_file = file_path
-            self.setWindowTitle(f"{os.path.basename(file_path)} - Лабораторная работа 1. Текстовый редактор")
+            self.editor.document().setModified(False)
+            self.setWindowTitle(f"{os.path.basename(file_path)} - Лабораторная работа 1. Текстовый редактор[*]")
+            self.setWindowModified(False)
+            self.statusBar().showMessage(f"Файл сохранен: {file_path}")
+            self.output_area.append(f"# Файл сохранен: {file_path}")
         except Exception as e:
-            print(f"Ошибка: {e}")
+            QMessageBox.critical(self, "Ошибка", f"Не удалось сохранить файл:\n{e}")
 
-    def show_text_info(self):
-        QMessageBox.information(self, "Информация", "Раздел будет реализован в следующих лабораторных работах")
-
-    def run_placeholder(self):
-        self.output_area.append("Анализатор будет запущен здесь")
-
-    def show_help(self):
-        self.output_area.setPlainText(
-            "Справка\n"
-            "\n"
-            "Файл: Создать (Ctrl+N), Открыть (Ctrl+O), Сохранить (Ctrl+S), Сохранить как (Ctrl+Shift+S), Выход (Ctrl+Q)\n"
-            "Правка: Отмена (Ctrl+Z), Повторить (Ctrl+Y), Копировать (Ctrl+C), Вставить (Ctrl+V), Выделить все (Ctrl+A)\n"
-            "Панель инструментов дублирует основные функции"
+    def maybe_save(self):
+        """Диалог подтверждения сохранения при выходе"""
+        if not self.editor.document().isModified():
+            return True
+        ret = QMessageBox.warning(
+            self, "Сохранение",
+            "Документ был изменен. Сохранить изменения?",
+            QMessageBox.StandardButton.Save |
+            QMessageBox.StandardButton.Discard |
+            QMessageBox.StandardButton.Cancel
         )
+        if ret == QMessageBox.StandardButton.Save:
+            return self.save_file()
+        elif ret == QMessageBox.StandardButton.Cancel:
+            return False
+        return True
+
+    def closeEvent(self, event):
+        """Перехват закрытия окна"""
+        if self.maybe_save():
+            event.accept()
+        else:
+            event.ignore()
+
+    # Методы для меню "Файлами"
+    def show_text_info(self, title):
+        dialog = QDialog(self)
+        dialog.setWindowTitle(title)
+        dialog.setMinimumWidth(400)
+        layout = QVBoxLayout(dialog)
+
+        label = QLabel(f"<b>{title}</b>\n\nЭтот раздел будет реализован в следующих лабораторных работах.\n\n"
+                       f"Здесь будет размещена информация о грамматике, методе анализа и т.д.")
+        label.setWordWrap(True)
+        label.setTextFormat(Qt.TextFormat.RichText)
+        layout.addWidget(label)
+
+        button_box = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok)
+        button_box.accepted.connect(dialog.accept)
+        layout.addWidget(button_box)
+
+        dialog.exec()
+
+    # Метод для меню "Пуск"
+    def run_analyzer(self):
+        """Простой анализатор - подсчет символов и строк"""
+        text = self.editor.toPlainText()
+
+        self.output_area.clear()
+        self.output_area.append("РЕЗУЛЬТАТ АНАЛИЗА:")
+        self.output_area.append("-" * 40)
+        self.output_area.append(f"Количество символов: {len(text)}")
+        self.output_area.append(f"Количество строк: {len(text.split('\n'))}")
+        self.output_area.append("-" * 40)
+        self.output_area.append("Анализ завершен")
+
+        self.statusBar().showMessage("Анализ завершен", 3000)
+
+    # Методы справки
+    def show_help(self):
+        help_text = """
+        <h2>Руководство пользователя</h2>
+        <p><b>Меню "Файл":</b></p>
+        <ul>
+            <li><b>Создать (Ctrl+N)</b> - новый файл</li>
+            <li><b>Открыть (Ctrl+O)</b> - открыть файл</li>
+            <li><b>Сохранить (Ctrl+S)</b> - сохранить изменения</li>
+            <li><b>Сохранить как (Ctrl+Shift+S)</b> - сохранить в новый файл</li>
+            <li><b>Выход (Ctrl+Q)</b> - закрыть программу</li>
+        </ul>
+        <p><b>Меню "Правка":</b></p>
+        <ul>
+            <li><b>Отмена (Ctrl+Z), Повтор (Ctrl+Y)</b></li>
+            <li><b>Вырезать (Ctrl+X), Копировать (Ctrl+C), Вставить (Ctrl+V)</b></li>
+            <li><b>Удалить (Del), Выделить все (Ctrl+A)</b></li>
+        </ul>
+        <p><b>Меню "Пуск" (F5):</b> запускает анализатор текста (подсчет символов и строк).</p>
+        """
+        self.output_area.setHtml(help_text)
 
     def show_about(self):
         QMessageBox.about(
             self,
             "О программе",
-            "Лабораторная работа 1\n"
-            "Автор: Топоев Максим\n"
-            "Группа: АП-327\n"
-            "Преподаватель: Антонянц Егор Николаевич\n"
-            "Кафедра АСУ"
+            "<b>Лабораторная работа 1</b><br>"
+            "Разработка пользовательского интерфейса для языкового процессора<br><br>"
+            "<b>Автор:</b> Топоев Максим<br>"
+            "<b>Группа:</b> АП-327<br>"
+            "<b>Преподаватель:</b> Антонянц Егор Николаевич<br>"
+            "<b>Кафедра:</b> АСУ<br>"
+            "<b>Год:</b> 2026"
         )
-
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)

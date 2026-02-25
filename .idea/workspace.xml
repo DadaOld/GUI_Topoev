@@ -4,19 +4,7 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="d210338a-96af-45c6-af8b-90215dcaf457" name="Changes" comment="Добавлена панель инструментов">
-      <change afterPath="$PROJECT_DIR$/Screenshots/stage3_help.png" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/Screenshots/stage3_info.png" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/Screenshots/stage3_main_window.png" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/icons/copy.png" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/icons/cut.png" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/icons/help.png" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/icons/info.png" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/icons/new.png" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/icons/open.png" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/icons/paste.png" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/icons/run.png" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/icons/save.png" afterDir="false" />
+    <list default="true" id="d210338a-96af-45c6-af8b-90215dcaf457" name="Changes" comment=" Реализована панель инструментов, добавлены иконки для нее, а так же, реализовано меню &quot;Справка&quot; и &quot;О программе&quot;">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/README.md" beforeDir="false" afterPath="$PROJECT_DIR$/README.md" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/main.py" beforeDir="false" afterPath="$PROJECT_DIR$/main.py" afterDir="false" />
@@ -156,7 +144,15 @@
       <option name="project" value="LOCAL" />
       <updated>1772041087705</updated>
     </task>
-    <option name="localTasksCounter" value="6" />
+    <task id="LOCAL-00006" summary=" Реализована панель инструментов, добавлены иконки для нее, а так же, реализовано меню &quot;Справка&quot; и &quot;О программе&quot;">
+      <option name="closed" value="true" />
+      <created>1772048099157</created>
+      <option name="number" value="00006" />
+      <option name="presentableId" value="LOCAL-00006" />
+      <option name="project" value="LOCAL" />
+      <updated>1772048099158</updated>
+    </task>
+    <option name="localTasksCounter" value="7" />
     <servers />
   </component>
   <component name="Vcs.Log.Tabs.Properties">
@@ -176,6 +172,7 @@
     <MESSAGE value="Пермещение скриншота в папку Screenshots" />
     <MESSAGE value="Реализация меню &quot;Файл&quot; и &quot;Правка&quot;." />
     <MESSAGE value="Добавлена панель инструментов" />
-    <option name="LAST_COMMIT_MESSAGE" value="Добавлена панель инструментов" />
+    <MESSAGE value=" Реализована панель инструментов, добавлены иконки для нее, а так же, реализовано меню &quot;Справка&quot; и &quot;О программе&quot;" />
+    <option name="LAST_COMMIT_MESSAGE" value=" Реализована панель инструментов, добавлены иконки для нее, а так же, реализовано меню &quot;Справка&quot; и &quot;О программе&quot;" />
   </component>
 </project>
