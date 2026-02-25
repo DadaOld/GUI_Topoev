@@ -4,8 +4,8 @@ from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QTextEdit, QVBoxLayout, QWidget,
     QMenu, QToolBar, QFileDialog, QMessageBox, QSplitter
 )
-from PyQt6.QtGui import QAction
-from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QAction, QIcon
+from PyQt6.QtCore import Qt, QSize
 
 
 class TextEditor(QMainWindow):
@@ -118,15 +118,23 @@ class TextEditor(QMainWindow):
         edit_menu.addAction(select_all_action)
 
         # Текст (пустое)
-        menubar.addMenu("Текст")
+        text_menu = menubar.addMenu("Текст")
+        text_info_action = QAction("Информация", self)
+        text_info_action.triggered.connect(self.show_text_info)
+        text_menu.addAction(text_info_action)
 
-        # Пуск (пустое)
-        menubar.addMenu("Пуск")
+        # Пуск
+        run_menu = menubar.addMenu("Пуск")
+        run_menu_action = QAction("Запуск анализатора", self)
+        run_menu_action.setShortcut("F5")
+        run_menu_action.triggered.connect(self.run_placeholder)
+        run_menu.addAction(run_menu_action)
 
         # Справка
         help_menu = menubar.addMenu("Справка")
 
         self.help_action = QAction("Справка", self)
+        self.help_action.setShortcut("F1")
         self.help_action.triggered.connect(self.show_help)
         help_menu.addAction(self.help_action)
 
@@ -139,35 +147,81 @@ class TextEditor(QMainWindow):
     def create_toolbar(self):
         toolbar = QToolBar("Панель инструментов")
         self.addToolBar(toolbar)
+        toolbar.setIconSize(QSize(24, 24))
 
-        # Кнопки файлов
-        toolbar.addAction(self.new_action)
-        toolbar.addAction(self.open_action)
-        toolbar.addAction(self.save_action)
+        def load_icon(filename):
+            icon_path = os.path.join("icons", filename)
+            if os.path.exists(icon_path):
+                return QIcon(icon_path)
+            return QIcon()
+
+        # СОЗДАЕМ ОТДЕЛЬНЫЕ ДЕЙСТВИЯ ДЛЯ ТУЛБАРА
+        # Они связаны с теми же функциями, но имеют свои иконки
+
+        # Создать
+        new_tb = QAction(load_icon("new.png"), "Создать", self)
+        new_tb.triggered.connect(self.new_file)
+        toolbar.addAction(new_tb)
+
+        # Открыть
+        open_tb = QAction(load_icon("open.png"), "Открыть", self)
+        open_tb.triggered.connect(self.open_file)
+        toolbar.addAction(open_tb)
+
+        # Сохранить
+        save_tb = QAction(load_icon("save.png"), "Сохранить", self)
+        save_tb.triggered.connect(self.save_file)
+        toolbar.addAction(save_tb)
+
         toolbar.addSeparator()
 
-        # Кнопки отмены/повтора
-        toolbar.addAction(self.undo_action)
-        toolbar.addAction(self.redo_action)
+        # Отменить
+        undo_tb = QAction(load_icon("undo.png"), "Отменить", self)
+        undo_tb.triggered.connect(self.editor.undo)
+        toolbar.addAction(undo_tb)
+
+        # Повторить
+        redo_tb = QAction(load_icon("redo.png"), "Повторить", self)
+        redo_tb.triggered.connect(self.editor.redo)
+        toolbar.addAction(redo_tb)
+
         toolbar.addSeparator()
 
-        # Кнопки буфера обмена
-        toolbar.addAction(self.cut_action)
-        toolbar.addAction(self.copy_action)
-        toolbar.addAction(self.paste_action)
+        # Вырезать
+        cut_tb = QAction(load_icon("cut.png"), "Вырезать", self)
+        cut_tb.triggered.connect(self.editor.cut)
+        toolbar.addAction(cut_tb)
+
+        # Копировать
+        copy_tb = QAction(load_icon("copy.png"), "Копировать", self)
+        copy_tb.triggered.connect(self.editor.copy)
+        toolbar.addAction(copy_tb)
+
+        # Вставить
+        paste_tb = QAction(load_icon("paste.png"), "Вставить", self)
+        paste_tb.triggered.connect(self.editor.paste)
+        toolbar.addAction(paste_tb)
+
         toolbar.addSeparator()
 
-        # Заглушка для кнопки Пуск
-        run_action = QAction("Пуск", self)
-        run_action.triggered.connect(self.run_placeholder)
-        toolbar.addAction(run_action)
+        # Пуск
+        run_tb = QAction(load_icon("run.png"), "Пуск", self)
+        run_tb.triggered.connect(self.run_placeholder)
+        toolbar.addAction(run_tb)
+
         toolbar.addSeparator()
 
-        # Кнопки справки
-        toolbar.addAction(self.help_action)
-        toolbar.addAction(self.about_action)
+        # Справка
+        help_tb = QAction(load_icon("help.png"), "Справка", self)
+        help_tb.triggered.connect(self.show_help)
+        toolbar.addAction(help_tb)
 
-    # Методы файлов
+        # О программе
+        about_tb = QAction(load_icon("info.png"), "О программе", self)
+        about_tb.triggered.connect(self.show_about)
+        toolbar.addAction(about_tb)
+
+    # Методы для работы с файлами
     def new_file(self):
         self.editor.clear()
         self.current_file = None
@@ -209,11 +263,12 @@ class TextEditor(QMainWindow):
         except Exception as e:
             print(f"Ошибка: {e}")
 
-    # Заглушка для кнопки Пуск
+    def show_text_info(self):
+        QMessageBox.information(self, "Информация", "Раздел будет реализован в следующих лабораторных работах")
+
     def run_placeholder(self):
         self.output_area.append("Анализатор будет запущен здесь")
 
-    # Методы справки
     def show_help(self):
         self.output_area.setPlainText(
             "Справка\n"

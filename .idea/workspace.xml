@@ -4,8 +4,21 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="d210338a-96af-45c6-af8b-90215dcaf457" name="Changes" comment="Реализация меню &quot;Файл&quot; и &quot;Правка&quot;.">
+    <list default="true" id="d210338a-96af-45c6-af8b-90215dcaf457" name="Changes" comment="Добавлена панель инструментов">
+      <change afterPath="$PROJECT_DIR$/Screenshots/stage3_help.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Screenshots/stage3_info.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Screenshots/stage3_main_window.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/icons/copy.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/icons/cut.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/icons/help.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/icons/info.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/icons/new.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/icons/open.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/icons/paste.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/icons/run.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/icons/save.png" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/README.md" beforeDir="false" afterPath="$PROJECT_DIR$/README.md" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/main.py" beforeDir="false" afterPath="$PROJECT_DIR$/main.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
@@ -135,7 +148,15 @@
       <option name="project" value="LOCAL" />
       <updated>1772039073357</updated>
     </task>
-    <option name="localTasksCounter" value="5" />
+    <task id="LOCAL-00005" summary="Добавлена панель инструментов">
+      <option name="closed" value="true" />
+      <created>1772041087705</created>
+      <option name="number" value="00005" />
+      <option name="presentableId" value="LOCAL-00005" />
+      <option name="project" value="LOCAL" />
+      <updated>1772041087705</updated>
+    </task>
+    <option name="localTasksCounter" value="6" />
     <servers />
   </component>
   <component name="Vcs.Log.Tabs.Properties">
@@ -154,6 +175,7 @@
     <MESSAGE value="Первое заполнение файла README" />
     <MESSAGE value="Пермещение скриншота в папку Screenshots" />
     <MESSAGE value="Реализация меню &quot;Файл&quot; и &quot;Правка&quot;." />
-    <option name="LAST_COMMIT_MESSAGE" value="Реализация меню &quot;Файл&quot; и &quot;Правка&quot;." />
+    <MESSAGE value="Добавлена панель инструментов" />
+    <option name="LAST_COMMIT_MESSAGE" value="Добавлена панель инструментов" />
   </component>
 </project>
