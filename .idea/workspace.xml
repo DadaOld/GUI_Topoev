@@ -4,7 +4,9 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="d210338a-96af-45c6-af8b-90215dcaf457" name="Changes" comment="Диалог подтверждения при выходе, звездочке(*) в заголовке окна при изменении, строка состояния, меню &quot;Текст&quot;.&#10;Проект завершен.">
+    <list default="true" id="d210338a-96af-45c6-af8b-90215dcaf457" name="Changes" comment="Дописан README.md, создан .exe файл">
+      <change afterPath="$PROJECT_DIR$/Screenshots/stage4_analyzer_work.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Screenshots/stage4_main_window.png" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/README.md" beforeDir="false" afterPath="$PROJECT_DIR$/README.md" afterDir="false" />
     </list>
@@ -159,7 +161,15 @@
       <option name="project" value="LOCAL" />
       <updated>1772055319054</updated>
     </task>
-    <option name="localTasksCounter" value="8" />
+    <task id="LOCAL-00008" summary="Дописан README.md, создан .exe файл">
+      <option name="closed" value="true" />
+      <created>1772056504747</created>
+      <option name="number" value="00008" />
+      <option name="presentableId" value="LOCAL-00008" />
+      <option name="project" value="LOCAL" />
+      <updated>1772056504747</updated>
+    </task>
+    <option name="localTasksCounter" value="9" />
     <servers />
   </component>
   <component name="Vcs.Log.Tabs.Properties">
@@ -181,6 +191,7 @@
     <MESSAGE value="Добавлена панель инструментов" />
     <MESSAGE value=" Реализована панель инструментов, добавлены иконки для нее, а так же, реализовано меню &quot;Справка&quot; и &quot;О программе&quot;" />
     <MESSAGE value="Диалог подтверждения при выходе, звездочке(*) в заголовке окна при изменении, строка состояния, меню &quot;Текст&quot;.&#10;Проект завершен." />
-    <option name="LAST_COMMIT_MESSAGE" value="Диалог подтверждения при выходе, звездочке(*) в заголовке окна при изменении, строка состояния, меню &quot;Текст&quot;.&#10;Проект завершен." />
+    <MESSAGE value="Дописан README.md, создан .exe файл" />
+    <option name="LAST_COMMIT_MESSAGE" value="Дописан README.md, создан .exe файл" />
   </component>
 </project>
