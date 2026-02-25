@@ -77,3 +77,12 @@
 2. Установить зависимости:
    ```bash
    pip install PyQt6
+3. Запустить программу:
+   `python main.py`
+
+#### Создание исполняемого файла (EXE)
+1. Установить PyInstaller
+   `pip install pyinstaller`
+2. Собрать проект:
+   `pyinstaller --onefile --windowed --name "TextEditor" main.py`
+3. Готовый файл находится в папке **dist/TextEditor.exe**
