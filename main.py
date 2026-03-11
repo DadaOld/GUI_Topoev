@@ -6,10 +6,9 @@ from PyQt6.QtWidgets import (
     QLabel, QDialogButtonBox, QTableWidget, QTableWidgetItem,
     QHeaderView
 )
-from PyQt6.QtGui import QAction, QIcon
+from PyQt6.QtGui import QAction, QIcon, QTextCursor
 from PyQt6.QtCore import Qt, QSize
 
-# Импортируем наш сканер
 from scanner import Scanner
 
 
@@ -17,43 +16,36 @@ class TextEditor(QMainWindow):
     def __init__(self):
         super().__init__()
         self.current_file = None
-        self.scanner = Scanner()  # Создаем экземпляр сканера
+        self.scanner = Scanner()
         self.init_ui()
 
     def init_ui(self):
         self.setWindowTitle("Лабораторная работа 2. Лексический анализатор [*]")
-        self.setGeometry(100, 100, 1400, 700)  # Чуть шире для таблицы
+        self.setGeometry(100, 100, 1400, 700)
 
-        # Центральный виджет
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
         layout = QVBoxLayout(central_widget)
         layout.setContentsMargins(0, 0, 0, 0)
 
-        # Главный вертикальный разделитель
         main_splitter = QSplitter(Qt.Orientation.Vertical)
-
-        # Верхний горизонтальный разделитель (редактор + таблица)
         top_splitter = QSplitter(Qt.Orientation.Horizontal)
 
-        # Область редактирования
         self.editor = QTextEdit()
         self.editor.setPlaceholderText("Область ввода текста...")
-        # Отслеживаем изменения для звездочки в заголовке
         self.editor.document().modificationChanged.connect(self.setWindowModified)
 
-        # Таблица результатов (НОВАЯ)
         self.results_table = QTableWidget()
         self.results_table.setColumnCount(4)
         self.results_table.setHorizontalHeaderLabels(["Код", "Тип лексемы", "Лексема", "Местоположение"])
         self.results_table.horizontalHeader().setStretchLastSection(True)
         self.results_table.setAlternatingRowColors(True)
+        self.results_table.itemClicked.connect(self.on_table_item_clicked)
 
         top_splitter.addWidget(self.editor)
         top_splitter.addWidget(self.results_table)
-        top_splitter.setSizes([700, 700])  # Равные размеры
+        top_splitter.setSizes([700, 700])
 
-        # Нижняя область для сообщений
         self.output_area = QTextEdit()
         self.output_area.setPlaceholderText("Область вывода результатов...")
         self.output_area.setReadOnly(True)
@@ -64,19 +56,13 @@ class TextEditor(QMainWindow):
 
         layout.addWidget(main_splitter)
 
-        # Создаем меню
         self.create_menus()
-
-        # Создаем панель инструментов
         self.create_toolbar()
-
-        # Строка состояния
         self.statusBar().showMessage("Готов к работе")
 
     def create_menus(self):
         menubar = self.menuBar()
 
-        # Меню файл
         file_menu = menubar.addMenu("Файл")
 
         self.new_action = QAction("Создать", self)
@@ -106,7 +92,6 @@ class TextEditor(QMainWindow):
         exit_action.triggered.connect(self.close)
         file_menu.addAction(exit_action)
 
-        # Меню правка
         edit_menu = menubar.addMenu("Правка")
 
         self.undo_action = QAction("Отменить", self)
@@ -148,7 +133,6 @@ class TextEditor(QMainWindow):
         select_all_action.triggered.connect(self.editor.selectAll)
         edit_menu.addAction(select_all_action)
 
-        # Меню текст
         text_menu = menubar.addMenu("Текст")
 
         text_items = [
@@ -166,14 +150,12 @@ class TextEditor(QMainWindow):
             action.triggered.connect(lambda checked, text=item_text: self.show_text_info(text))
             text_menu.addAction(action)
 
-        # Меню пуск
         run_menu = menubar.addMenu("Пуск")
         self.run_action = QAction("Запуск анализатора", self)
         self.run_action.setShortcut("F5")
         self.run_action.triggered.connect(self.run_analyzer)
         run_menu.addAction(self.run_action)
 
-        # Меню справка
         help_menu = menubar.addMenu("Справка")
 
         self.help_action = QAction("Вызов справки", self)
@@ -198,72 +180,58 @@ class TextEditor(QMainWindow):
                 return QIcon(icon_path)
             return QIcon()
 
-        # Создаем отдельные действия для тулбара с иконками
-
-        # Создать
         new_tb = QAction(load_icon("new.png"), "Создать", self)
         new_tb.triggered.connect(self.new_file)
         toolbar.addAction(new_tb)
 
-        # Открыть
         open_tb = QAction(load_icon("open.png"), "Открыть", self)
         open_tb.triggered.connect(self.open_file)
         toolbar.addAction(open_tb)
 
-        # Сохранить
         save_tb = QAction(load_icon("save.png"), "Сохранить", self)
         save_tb.triggered.connect(self.save_file)
         toolbar.addAction(save_tb)
 
         toolbar.addSeparator()
 
-        # Отменить
         undo_tb = QAction(load_icon("undo.png"), "Отменить", self)
         undo_tb.triggered.connect(self.editor.undo)
         toolbar.addAction(undo_tb)
 
-        # Повторить
         redo_tb = QAction(load_icon("redo.png"), "Повторить", self)
         redo_tb.triggered.connect(self.editor.redo)
         toolbar.addAction(redo_tb)
 
         toolbar.addSeparator()
 
-        # Вырезать
         cut_tb = QAction(load_icon("cut.png"), "Вырезать", self)
         cut_tb.triggered.connect(self.editor.cut)
         toolbar.addAction(cut_tb)
 
-        # Копировать
         copy_tb = QAction(load_icon("copy.png"), "Копировать", self)
         copy_tb.triggered.connect(self.editor.copy)
         toolbar.addAction(copy_tb)
 
-        # Вставить
         paste_tb = QAction(load_icon("paste.png"), "Вставить", self)
         paste_tb.triggered.connect(self.editor.paste)
         toolbar.addAction(paste_tb)
 
         toolbar.addSeparator()
 
-        # Пуск
         run_tb = QAction(load_icon("run.png"), "Пуск", self)
         run_tb.triggered.connect(self.run_analyzer)
         toolbar.addAction(run_tb)
 
         toolbar.addSeparator()
 
-        # Справка
         help_tb = QAction(load_icon("help.png"), "Справка", self)
         help_tb.triggered.connect(self.show_help)
         toolbar.addAction(help_tb)
 
-        # О программе
         about_tb = QAction(load_icon("info.png"), "О программе", self)
         about_tb.triggered.connect(self.show_about)
         toolbar.addAction(about_tb)
 
-    # Методы для работы с файлами
     def new_file(self):
         if self.maybe_save():
             self.editor.clear()
@@ -321,7 +289,6 @@ class TextEditor(QMainWindow):
             QMessageBox.critical(self, "Ошибка", f"Не удалось сохранить файл:\n{e}")
 
     def maybe_save(self):
-        """Диалог подтверждения сохранения при выходе"""
         if not self.editor.document().isModified():
             return True
         ret = QMessageBox.warning(
@@ -338,70 +305,95 @@ class TextEditor(QMainWindow):
         return True
 
     def closeEvent(self, event):
-        """Перехват закрытия окна"""
         if self.maybe_save():
             event.accept()
         else:
             event.ignore()
 
     def clear_results(self):
-        """Очистка таблицы результатов и области вывода"""
         self.results_table.setRowCount(0)
         self.output_area.clear()
 
-    # Метод для меню "Пуск" - ОБНОВЛЕННЫЙ
     def run_analyzer(self):
-        """Запуск лексического анализатора"""
         text = self.editor.toPlainText()
 
         if not text:
             QMessageBox.information(self, "Анализатор", "Нет текста для анализа.")
             return
 
-        # Очищаем старые результаты
         self.clear_results()
 
         self.output_area.append("Запуск анализа\n")
 
-        # Запускаем сканер
         tokens, errors = self.scanner.scan(text)
+        table_data = self.scanner.get_table_data(tokens, errors)
 
-        # Заполняем таблицу
-        self.results_table.setRowCount(len(tokens))
+        self.results_table.setRowCount(len(table_data))
 
-        for row, token in enumerate(tokens):
-            # Код
-            code_item = QTableWidgetItem(str(token.code))
+        for row, item in enumerate(table_data):
+            code_item = QTableWidgetItem(str(item['code']))
             code_item.setFlags(code_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
+            if item.get('is_error', False):
+                code_item.setBackground(Qt.GlobalColor.red)
+                code_item.setForeground(Qt.GlobalColor.white)
             self.results_table.setItem(row, 0, code_item)
 
-            # Тип
-            type_item = QTableWidgetItem(token.type_desc)
+            type_item = QTableWidgetItem(item['type_desc'])
             type_item.setFlags(type_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
+            if item.get('is_error', False):
+                type_item.setBackground(Qt.GlobalColor.red)
+                type_item.setForeground(Qt.GlobalColor.white)
             self.results_table.setItem(row, 1, type_item)
 
-            # Лексема (используем repr чтобы видеть пробелы и спецсимволы)
-            value_item = QTableWidgetItem(repr(token.value))
+            value_item = QTableWidgetItem(repr(item['value']))
             value_item.setFlags(value_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
+            if item.get('is_error', False):
+                value_item.setBackground(Qt.GlobalColor.red)
+                value_item.setForeground(Qt.GlobalColor.white)
             self.results_table.setItem(row, 2, value_item)
 
-            # Местоположение
-            loc_item = QTableWidgetItem(f"строка {token.line}, {token.start_pos}-{token.end_pos}")
+            loc_item = QTableWidgetItem(item['location'])
             loc_item.setFlags(loc_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
+            if item.get('is_error', False):
+                loc_item.setBackground(Qt.GlobalColor.red)
+                loc_item.setForeground(Qt.GlobalColor.white)
             self.results_table.setItem(row, 3, loc_item)
 
-        # Подгоняем ширину колонок
+            if not item.get('is_error', False):
+                item['is_error'] = False
+            self.results_table.item(row, 0).setData(Qt.ItemDataRole.UserRole, item)
+
         self.results_table.resizeColumnsToContents()
         self.results_table.horizontalHeader().setStretchLastSection(True)
 
-        # Выводим статистику
         self.output_area.append(f"Найдено токенов: {len(tokens)}")
         self.output_area.append(f"Ошибок: {len(errors)}")
         self.output_area.append("\nАнализ завершен")
 
-        self.statusBar().showMessage(f"Анализ завершен. Найдено токенов: {len(tokens)}", 3000)
+        self.statusBar().showMessage(f"Анализ завершен. Найдено токенов: {len(tokens)}, Ошибок: {len(errors)}", 3000)
 
-    # Методы для меню "Текст"
+    def on_table_item_clicked(self, item):
+        row = item.row()
+        data_item = self.results_table.item(row, 0)
+        if data_item:
+            token_data = data_item.data(Qt.ItemDataRole.UserRole)
+            if token_data:
+                line = token_data.get('line', 1)
+                start = token_data.get('start', 1)
+                self.go_to_position(line, start)
+                if token_data.get('is_error', False):
+                    self.statusBar().showMessage(f"Ошибка: {token_data.get('message', 'Неизвестная ошибка')}", 3000)
+
+    def go_to_position(self, line, column):
+        cursor = self.editor.textCursor()
+        cursor.movePosition(QTextCursor.MoveOperation.Start)
+        if line > 1:
+            cursor.movePosition(QTextCursor.MoveOperation.Down, QTextCursor.MoveMode.MoveAnchor, line - 1)
+        cursor.movePosition(QTextCursor.MoveOperation.Right, QTextCursor.MoveMode.MoveAnchor, column - 1)
+        cursor.movePosition(QTextCursor.MoveOperation.Right, QTextCursor.MoveMode.KeepAnchor, 1)
+        self.editor.setTextCursor(cursor)
+        self.editor.setFocus()
+
     def show_text_info(self, title):
         dialog = QDialog(self)
         dialog.setWindowTitle(title)
@@ -420,7 +412,6 @@ class TextEditor(QMainWindow):
 
         dialog.exec()
 
-    # Методы справки
     def show_help(self):
         help_text = """
         <h2>Руководство пользователя</h2>
@@ -439,33 +430,35 @@ class TextEditor(QMainWindow):
             <li><b>Удалить (Del), Выделить все (Ctrl+A)</b></li>
         </ul>
         <p><b>Меню "Пуск" (F5):</b> запускает лексический анализатор.</p>
-        <p><b>Этап 3:</b> полный набор лексем для Java-подобного языка.</p>
-
-        <h3>Коды лексем на этапе 3:</h3>
+        <p><b>Полная версия:</b> распознаются ключевые слова, идентификаторы, числа, операторы, разделители и пробельные символы. Недопустимые символы отображаются как ошибки.</p>
+        <h3>Коды лексем:</h3>
         <ul>
             <li><b>0</b> - пробел</li>
             <li><b>1</b> - ключевое слово if</li>
             <li><b>2</b> - ключевое слово else</li>
             <li><b>3</b> - идентификатор</li>
             <li><b>4</b> - оператор присваивания (=)</li>
-            <li><b>5</b> - оператор сравнения (>)</li>
-            <li><b>6</b> - оператор сравнения (<)</li>
-            <li><b>7</b> - оператор сравнения (>=)</li>
-            <li><b>8</b> - оператор сравнения (<=)</li>
-            <li><b>9</b> - оператор сравнения (==)</li>
-            <li><b>10</b> - оператор сравнения (!=)</li>
-            <li><b>11</b> - арифметический оператор (+)</li>
-            <li><b>12</b> - арифметический оператор (-)</li>
-            <li><b>13</b> - арифметический оператор (*)</li>
-            <li><b>14</b> - арифметический оператор (/)</li>
-            <li><b>15</b> - открывающая скобка (()</li>
-            <li><b>16</b> - закрывающая скобка ())</li>
-            <li><b>17</b> - открывающая фигурная скобка ({)</li>
-            <li><b>18</b> - закрывающая фигурная скобка (})</li>
-            <li><b>19</b> - конец оператора (;)</li>
+            <li><b>5</b> - оператор сравнения ></li>
+            <li><b>6</b> - оператор сравнения <</li>
+            <li><b>7</b> - оператор сравнения >=</li>
+            <li><b>8</b> - оператор сравнения <=</li>
+            <li><b>9</b> - оператор сравнения ==</li>
+            <li><b>10</b> - оператор сравнения !=</li>
+            <li><b>11</b> - арифметический оператор +</li>
+            <li><b>12</b> - арифметический оператор -</li>
+            <li><b>13</b> - арифметический оператор *</li>
+            <li><b>14</b> - арифметический оператор /</li>
+            <li><b>15</b> - открывающая скобка (</li>
+            <li><b>16</b> - закрывающая скобка )</li>
+            <li><b>17</b> - открывающая фигурная скобка {</li>
+            <li><b>18</b> - закрывающая фигурная скобка }</li>
+            <li><b>19</b> - конец оператора ;</li>
             <li><b>20</b> - табуляция</li>
             <li><b>21</b> - новая строка</li>
+            <li><b>22</b> - число</li>
+            <li><b>-1</b> - ошибка (недопустимый символ)</li>
         </ul>
+        <p><b>Навигация:</b> Клик по любой строке таблицы перемещает курсор на соответствующую позицию в тексте. Ошибки выделены красным цветом.</p>
         """
         self.output_area.setHtml(help_text)
 
