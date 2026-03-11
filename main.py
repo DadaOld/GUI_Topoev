@@ -3,21 +3,26 @@ import os
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QTextEdit, QVBoxLayout, QWidget,
     QMenu, QToolBar, QFileDialog, QMessageBox, QSplitter, QDialog,
-    QLabel, QDialogButtonBox
+    QLabel, QDialogButtonBox, QTableWidget, QTableWidgetItem,
+    QHeaderView
 )
 from PyQt6.QtGui import QAction, QIcon
 from PyQt6.QtCore import Qt, QSize
+
+# Импортируем наш сканер
+from scanner import Scanner
 
 
 class TextEditor(QMainWindow):
     def __init__(self):
         super().__init__()
         self.current_file = None
+        self.scanner = Scanner()  # Создаем экземпляр сканера
         self.init_ui()
 
     def init_ui(self):
-        self.setWindowTitle("Лабораторная работа 1. Текстовый редактор [*]")
-        self.setGeometry(100, 100, 1200, 700)
+        self.setWindowTitle("Лабораторная работа 2. Лексический анализатор (Этап 1) [*]")
+        self.setGeometry(100, 100, 1400, 700)  # Чуть шире для таблицы
 
         # Центральный виджет
         central_widget = QWidget()
@@ -25,8 +30,11 @@ class TextEditor(QMainWindow):
         layout = QVBoxLayout(central_widget)
         layout.setContentsMargins(0, 0, 0, 0)
 
-        # Разделитель для двух областей
-        splitter = QSplitter(Qt.Orientation.Vertical)
+        # Главный вертикальный разделитель
+        main_splitter = QSplitter(Qt.Orientation.Vertical)
+
+        # Верхний горизонтальный разделитель (редактор + таблица)
+        top_splitter = QSplitter(Qt.Orientation.Horizontal)
 
         # Область редактирования
         self.editor = QTextEdit()
@@ -34,15 +42,27 @@ class TextEditor(QMainWindow):
         # Отслеживаем изменения для звездочки в заголовке
         self.editor.document().modificationChanged.connect(self.setWindowModified)
 
-        # Область вывода
+        # Таблица результатов (НОВАЯ)
+        self.results_table = QTableWidget()
+        self.results_table.setColumnCount(4)
+        self.results_table.setHorizontalHeaderLabels(["Код", "Тип лексемы", "Лексема", "Местоположение"])
+        self.results_table.horizontalHeader().setStretchLastSection(True)
+        self.results_table.setAlternatingRowColors(True)
+
+        top_splitter.addWidget(self.editor)
+        top_splitter.addWidget(self.results_table)
+        top_splitter.setSizes([700, 700])  # Равные размеры
+
+        # Нижняя область для сообщений
         self.output_area = QTextEdit()
         self.output_area.setPlaceholderText("Область вывода результатов...")
         self.output_area.setReadOnly(True)
 
-        splitter.addWidget(self.editor)
-        splitter.addWidget(self.output_area)
-        splitter.setSizes([500, 200])
-        layout.addWidget(splitter)
+        main_splitter.addWidget(top_splitter)
+        main_splitter.addWidget(self.output_area)
+        main_splitter.setSizes([500, 200])
+
+        layout.addWidget(main_splitter)
 
         # Создаем меню
         self.create_menus()
@@ -51,7 +71,7 @@ class TextEditor(QMainWindow):
         self.create_toolbar()
 
         # Строка состояния
-        self.statusBar().showMessage("Готов к работе")
+        self.statusBar().showMessage("Готов к работе (Этап 1: пробелы)")
 
     def create_menus(self):
         menubar = self.menuBar()
@@ -248,8 +268,9 @@ class TextEditor(QMainWindow):
         if self.maybe_save():
             self.editor.clear()
             self.current_file = None
-            self.setWindowTitle("Лабораторная работа 1. Текстовый редактор [*]")
+            self.setWindowTitle("Лабораторная работа 2. Лексический анализатор (Этап 1) [*]")
             self.setWindowModified(False)
+            self.clear_results()
             self.statusBar().showMessage("Новый файл создан")
 
     def open_file(self):
@@ -263,8 +284,9 @@ class TextEditor(QMainWindow):
                         content = f.read()
                     self.editor.setPlainText(content)
                     self.current_file = file_path
-                    self.setWindowTitle(f"{os.path.basename(file_path)} - Лабораторная работа 1. Текстовый редактор[*]")
+                    self.setWindowTitle(f"{os.path.basename(file_path)} - Лабораторная работа 2 (Этап 1)[*]")
                     self.setWindowModified(False)
+                    self.clear_results()
                     self.statusBar().showMessage(f"Файл загружен: {file_path}")
                     self.output_area.append(f"# Файл загружен: {file_path}\n")
                 except Exception as e:
@@ -291,7 +313,7 @@ class TextEditor(QMainWindow):
                 f.write(self.editor.toPlainText())
             self.current_file = file_path
             self.editor.document().setModified(False)
-            self.setWindowTitle(f"{os.path.basename(file_path)} - Лабораторная работа 1. Текстовый редактор[*]")
+            self.setWindowTitle(f"{os.path.basename(file_path)} - Лабораторная работа 2 (Этап 1)[*]")
             self.setWindowModified(False)
             self.statusBar().showMessage(f"Файл сохранен: {file_path}")
             self.output_area.append(f"# Файл сохранен: {file_path}")
@@ -322,7 +344,64 @@ class TextEditor(QMainWindow):
         else:
             event.ignore()
 
-    # Методы для меню "Файлами"
+    def clear_results(self):
+        """Очистка таблицы результатов и области вывода"""
+        self.results_table.setRowCount(0)
+        self.output_area.clear()
+
+    # Метод для меню "Пуск" - ОБНОВЛЕННЫЙ
+    def run_analyzer(self):
+        """Запуск лексического анализатора"""
+        text = self.editor.toPlainText()
+
+        if not text:
+            QMessageBox.information(self, "Анализатор", "Нет текста для анализа.")
+            return
+
+        # Очищаем старые результаты
+        self.clear_results()
+
+        self.output_area.append("Запуск анализа\n")
+
+        # Запускаем сканер
+        tokens, errors = self.scanner.scan(text)
+
+        # Заполняем таблицу
+        self.results_table.setRowCount(len(tokens))
+
+        for row, token in enumerate(tokens):
+            # Код
+            code_item = QTableWidgetItem(str(token.code))
+            code_item.setFlags(code_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
+            self.results_table.setItem(row, 0, code_item)
+
+            # Тип
+            type_item = QTableWidgetItem(token.type_desc)
+            type_item.setFlags(type_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
+            self.results_table.setItem(row, 1, type_item)
+
+            # Лексема (используем repr чтобы видеть пробелы и спецсимволы)
+            value_item = QTableWidgetItem(repr(token.value))
+            value_item.setFlags(value_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
+            self.results_table.setItem(row, 2, value_item)
+
+            # Местоположение
+            loc_item = QTableWidgetItem(f"строка {token.line}, {token.start_pos}-{token.end_pos}")
+            loc_item.setFlags(loc_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
+            self.results_table.setItem(row, 3, loc_item)
+
+        # Подгоняем ширину колонок
+        self.results_table.resizeColumnsToContents()
+        self.results_table.horizontalHeader().setStretchLastSection(True)
+
+        # Выводим статистику
+        self.output_area.append(f"Найдено токенов: {len(tokens)}")
+        self.output_area.append(f"Ошибок: {len(errors)}")
+        self.output_area.append("\nАнализ завершен")
+
+        self.statusBar().showMessage(f"Анализ завершен. Найдено токенов: {len(tokens)}", 3000)
+
+    # Методы для меню "Текст"
     def show_text_info(self, title):
         dialog = QDialog(self)
         dialog.setWindowTitle(title)
@@ -340,21 +419,6 @@ class TextEditor(QMainWindow):
         layout.addWidget(button_box)
 
         dialog.exec()
-
-    # Метод для меню "Пуск"
-    def run_analyzer(self):
-        """Простой анализатор - подсчет символов и строк"""
-        text = self.editor.toPlainText()
-
-        self.output_area.clear()
-        self.output_area.append("РЕЗУЛЬТАТ АНАЛИЗА:")
-        self.output_area.append("-" * 40)
-        self.output_area.append(f"Количество символов: {len(text)}")
-        self.output_area.append(f"Количество строк: {len(text.split('\n'))}")
-        self.output_area.append("-" * 40)
-        self.output_area.append("Анализ завершен")
-
-        self.statusBar().showMessage("Анализ завершен", 3000)
 
     # Методы справки
     def show_help(self):
@@ -374,7 +438,8 @@ class TextEditor(QMainWindow):
             <li><b>Вырезать (Ctrl+X), Копировать (Ctrl+C), Вставить (Ctrl+V)</b></li>
             <li><b>Удалить (Del), Выделить все (Ctrl+A)</b></li>
         </ul>
-        <p><b>Меню "Пуск" (F5):</b> запускает анализатор текста (подсчет символов и строк).</p>
+        <p><b>Меню "Пуск" (F5):</b> запускает лексический анализатор.</p>
+        <p><b>Этап 1:</b> распознаются только пробелы, табуляции и переносы строк.</p>
         """
         self.output_area.setHtml(help_text)
 
@@ -382,14 +447,15 @@ class TextEditor(QMainWindow):
         QMessageBox.about(
             self,
             "О программе",
-            "<b>Лабораторная работа 1</b><br>"
-            "Разработка пользовательского интерфейса для языкового процессора<br><br>"
+            "<b>Лабораторная работа 2</b><br>"
+            "Лексический анализатор (сканер) - Этап 1<br><br>"
             "<b>Автор:</b> Топоев Максим<br>"
             "<b>Группа:</b> АП-327<br>"
             "<b>Преподаватель:</b> Антонянц Егор Николаевич<br>"
             "<b>Кафедра:</b> АСУ<br>"
             "<b>Год:</b> 2026"
         )
+
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)

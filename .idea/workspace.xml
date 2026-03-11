@@ -4,11 +4,8 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="d210338a-96af-45c6-af8b-90215dcaf457" name="Changes" comment="Дописан README.md, создан .exe файл">
-      <change afterPath="$PROJECT_DIR$/Screenshots/stage4_analyzer_work.png" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/Screenshots/stage4_main_window.png" afterDir="false" />
+    <list default="true" id="d210338a-96af-45c6-af8b-90215dcaf457" name="Changes" comment="Точно дописан файл README">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/README.md" beforeDir="false" afterPath="$PROJECT_DIR$/README.md" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -25,21 +22,21 @@
   <component name="Git.Settings">
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
   </component>
-  <component name="GitHubPullRequestSearchHistory"><![CDATA[{
-  "lastFilter": {
-    "state": "OPEN",
-    "assignee": "DadaOld"
+  <component name="GitHubPullRequestSearchHistory">{
+  &quot;lastFilter&quot;: {
+    &quot;state&quot;: &quot;OPEN&quot;,
+    &quot;assignee&quot;: &quot;DadaOld&quot;
   }
-}]]></component>
-  <component name="GithubPullRequestsUISettings"><![CDATA[{
-  "selectedUrlAndAccountId": {
-    "url": "https://github.com/DadaOld/GUI_Topoev",
-    "accountId": "6bce9b9b-a116-49fb-a40f-7daeb4d3168e"
+}</component>
+  <component name="GithubPullRequestsUISettings">{
+  &quot;selectedUrlAndAccountId&quot;: {
+    &quot;url&quot;: &quot;https://github.com/DadaOld/GUI_Topoev&quot;,
+    &quot;accountId&quot;: &quot;6bce9b9b-a116-49fb-a40f-7daeb4d3168e&quot;
   }
-}]]></component>
-  <component name="ProjectColorInfo"><![CDATA[{
-  "associatedIndex": 4
-}]]></component>
+}</component>
+  <component name="ProjectColorInfo">{
+  &quot;associatedIndex&quot;: 4
+}</component>
   <component name="ProjectId" id="3AALgo6iVKDPg2OG2yer36oPAp0" />
   <component name="ProjectLevelVcsManager" settingsEditedManually="true">
     <ConfirmationsSetting value="2" id="Add" />
@@ -52,7 +49,9 @@
   "keyToString": {
     "Python.main.executor": "Run",
     "RunOnceActivity.ShowReadmeOnStart": "true",
-    "git-widget-placeholder": "master"
+    "git-widget-placeholder": "master",
+    "last_opened_file_path": "C:/Users/maksi/Python/Projects/django",
+    "settings.editor.selected.configurable": "com.jetbrains.python.configuration.PyActiveSdkModuleConfigurable"
   }
 }]]></component>
   <component name="RecentsManager">
@@ -169,7 +168,15 @@
       <option name="project" value="LOCAL" />
       <updated>1772056504747</updated>
     </task>
-    <option name="localTasksCounter" value="9" />
+    <task id="LOCAL-00009" summary="Точно дописан файл README">
+      <option name="closed" value="true" />
+      <created>1772059491740</created>
+      <option name="number" value="00009" />
+      <option name="presentableId" value="LOCAL-00009" />
+      <option name="project" value="LOCAL" />
+      <updated>1772059491740</updated>
+    </task>
+    <option name="localTasksCounter" value="10" />
     <servers />
   </component>
   <component name="Vcs.Log.Tabs.Properties">
@@ -192,6 +199,7 @@
     <MESSAGE value=" Реализована панель инструментов, добавлены иконки для нее, а так же, реализовано меню &quot;Справка&quot; и &quot;О программе&quot;" />
     <MESSAGE value="Диалог подтверждения при выходе, звездочке(*) в заголовке окна при изменении, строка состояния, меню &quot;Текст&quot;.&#10;Проект завершен." />
     <MESSAGE value="Дописан README.md, создан .exe файл" />
-    <option name="LAST_COMMIT_MESSAGE" value="Дописан README.md, создан .exe файл" />
+    <MESSAGE value="Точно дописан файл README" />
+    <option name="LAST_COMMIT_MESSAGE" value="Точно дописан файл README" />
   </component>
 </project>
