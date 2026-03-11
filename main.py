@@ -21,7 +21,7 @@ class TextEditor(QMainWindow):
         self.init_ui()
 
     def init_ui(self):
-        self.setWindowTitle("Лабораторная работа 2. Лексический анализатор (Этап 1) [*]")
+        self.setWindowTitle("Лабораторная работа 2. Лексический анализатор [*]")
         self.setGeometry(100, 100, 1400, 700)  # Чуть шире для таблицы
 
         # Центральный виджет
@@ -71,7 +71,7 @@ class TextEditor(QMainWindow):
         self.create_toolbar()
 
         # Строка состояния
-        self.statusBar().showMessage("Готов к работе (Этап 1: пробелы)")
+        self.statusBar().showMessage("Готов к работе")
 
     def create_menus(self):
         menubar = self.menuBar()
@@ -268,7 +268,7 @@ class TextEditor(QMainWindow):
         if self.maybe_save():
             self.editor.clear()
             self.current_file = None
-            self.setWindowTitle("Лабораторная работа 2. Лексический анализатор (Этап 1) [*]")
+            self.setWindowTitle("Лабораторная работа 2. Лексический анализатор[*]")
             self.setWindowModified(False)
             self.clear_results()
             self.statusBar().showMessage("Новый файл создан")
@@ -284,7 +284,7 @@ class TextEditor(QMainWindow):
                         content = f.read()
                     self.editor.setPlainText(content)
                     self.current_file = file_path
-                    self.setWindowTitle(f"{os.path.basename(file_path)} - Лабораторная работа 2 (Этап 1)[*]")
+                    self.setWindowTitle(f"{os.path.basename(file_path)} - Лабораторная работа 2[*]")
                     self.setWindowModified(False)
                     self.clear_results()
                     self.statusBar().showMessage(f"Файл загружен: {file_path}")
@@ -313,7 +313,7 @@ class TextEditor(QMainWindow):
                 f.write(self.editor.toPlainText())
             self.current_file = file_path
             self.editor.document().setModified(False)
-            self.setWindowTitle(f"{os.path.basename(file_path)} - Лабораторная работа 2 (Этап 1)[*]")
+            self.setWindowTitle(f"{os.path.basename(file_path)} - Лабораторная работа 2[*]")
             self.setWindowModified(False)
             self.statusBar().showMessage(f"Файл сохранен: {file_path}")
             self.output_area.append(f"# Файл сохранен: {file_path}")
@@ -439,7 +439,17 @@ class TextEditor(QMainWindow):
             <li><b>Удалить (Del), Выделить все (Ctrl+A)</b></li>
         </ul>
         <p><b>Меню "Пуск" (F5):</b> запускает лексический анализатор.</p>
-        <p><b>Этап 1:</b> распознаются только пробелы, табуляции и переносы строк.</p>
+        <p><b>Этап 2:</b> распознаются пробелы, табуляции, переносы строк, идентификаторы и ключевые слова if/else.</p>
+
+        <h3>Коды лексем на этапе 2:</h3>
+        <ul>
+            <li><b>0</b> - пробел</li>
+            <li><b>1</b> - ключевое слово if</li>
+            <li><b>2</b> - ключевое слово else</li>
+            <li><b>3</b> - идентификатор</li>
+            <li><b>20</b> - табуляция</li>
+            <li><b>21</b> - новая строка</li>
+        </ul>
         """
         self.output_area.setHtml(help_text)
 
@@ -448,7 +458,6 @@ class TextEditor(QMainWindow):
             self,
             "О программе",
             "<b>Лабораторная работа 2</b><br>"
-            "Лексический анализатор (сканер) - Этап 1<br><br>"
             "<b>Автор:</b> Топоев Максим<br>"
             "<b>Группа:</b> АП-327<br>"
             "<b>Преподаватель:</b> Антонянц Егор Николаевич<br>"
