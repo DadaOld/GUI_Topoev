@@ -1,5 +1,3 @@
-# scanner.py - ЭТАП 1: Пробелы и базовая структура
-
 class TokenType:
     """Типы лексем с числовыми кодами"""
     # Пробельные символы
@@ -7,11 +5,6 @@ class TokenType:
     TAB = 20  # табуляция
     NEWLINE = 21  # новая строка
 
-
-# scanner.py - ЭТАП 1: Пробелы
-# Просто создай этот файл в той же папке, где лежит main.py
-
-# scanner.py - ЭТАП 2: Идентификаторы и ключевые слова
 
 class Token:
     """Класс для хранения информации о лексеме"""
@@ -38,13 +31,41 @@ class Token:
 
 
 class Scanner:
-    """Лексический анализатор - ЭТАП 2 (добавлены идентификаторы и ключевые слова)"""
+    """Лексический анализатор - ЭТАП 3 (добавлены операторы и разделители)"""
 
     def __init__(self):
         # Ключевые слова и их коды
         self.keywords = {
             'if': (1, "ключевое слово if"),
             'else': (2, "ключевое слово else")
+        }
+
+        # Операторы (односимвольные)
+        self.operators = {
+            '=': (4, "оператор присваивания"),
+            '+': (11, "арифметический оператор +"),
+            '-': (12, "арифметический оператор -"),
+            '*': (13, "арифметический оператор *"),
+            '/': (14, "арифметический оператор /"),
+            '(': (15, "открывающая скобка"),
+            ')': (16, "закрывающая скобка"),
+            '{': (17, "открывающая фигурная скобка"),
+            '}': (18, "закрывающая фигурная скобка"),
+            ';': (19, "конец оператора")
+        }
+
+        # Двухсимвольные операторы
+        self.two_char_operators = {
+            '>=': (7, "оператор сравнения >="),
+            '<=': (8, "оператор сравнения <="),
+            '==': (9, "оператор сравнения =="),
+            '!=': (10, "оператор сравнения !=")
+        }
+
+        # Односимвольные операторы сравнения (для обработки > и < отдельно)
+        self.compare_ops = {
+            '>': (5, "оператор сравнения >"),
+            '<': (6, "оператор сравнения <")
         }
 
     def is_letter(self, ch):
@@ -62,6 +83,7 @@ class Scanner:
         - пробелы (0), табуляции (20), переносы строк (21)
         - ключевые слова if (1) и else (2)
         - идентификаторы (3)
+        - операторы и разделители (4-19)
         """
         tokens = []
         errors = []
@@ -75,7 +97,7 @@ class Scanner:
             ch = text[i]
             pos = i - line_start + 1  # позиция в строке (с 1)
 
-            # Обработка пробельных символов
+            # Пробельные символы
             if ch == '\n':
                 tokens.append(Token(21, "новая строка", ch, line, pos, pos))
                 line += 1
@@ -90,26 +112,41 @@ class Scanner:
                 tokens.append(Token(20, "табуляция", ch, line, pos, pos))
                 i += 1
 
-            # Обработка идентификаторов и ключевых слов
+            # Идентификаторы и ключевые слова
             elif self.is_letter(ch):
-                # Начало идентификатора/ключа
                 start_i = i
                 start_line = line
                 start_pos = pos
                 value = ""
 
-                # Считываем все буквы, цифры и подчеркивания
                 while i < n and self.is_letter_or_digit(text[i]):
                     value += text[i]
                     i += 1
 
-                # Проверяем, не ключевое ли это слово
                 if value in self.keywords:
                     code, desc = self.keywords[value]
                     tokens.append(Token(code, desc, value, start_line, start_pos, start_pos + len(value) - 1))
                 else:
-                    # Обычный идентификатор
                     tokens.append(Token(3, "идентификатор", value, start_line, start_pos, start_pos + len(value) - 1))
+
+            # Двухсимвольные операторы (>=, <=, ==, !=)
+            elif i + 1 < n and text[i:i + 2] in self.two_char_operators:
+                two_chars = text[i:i + 2]
+                code, desc = self.two_char_operators[two_chars]
+                tokens.append(Token(code, desc, two_chars, line, pos, pos + 1))
+                i += 2
+
+            # Односимвольные операторы сравнения (>, <)
+            elif ch in self.compare_ops:
+                code, desc = self.compare_ops[ch]
+                tokens.append(Token(code, desc, ch, line, pos, pos))
+                i += 1
+
+            # Остальные операторы и разделители (=, +, -, *, /, (, ), {, }, ;)
+            elif ch in self.operators:
+                code, desc = self.operators[ch]
+                tokens.append(Token(code, desc, ch, line, pos, pos))
+                i += 1
 
             # Все остальные символы пока игнорируем
             else:
