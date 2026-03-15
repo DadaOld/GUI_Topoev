@@ -6,6 +6,8 @@ class TokenType:
     NEWLINE = 21
 
 class Token:
+    """Класс для хранения информации о лексеме"""
+
     def __init__(self, code, type_desc, value, line, start_pos, end_pos):
         self.code = code
         self.type_desc = type_desc
@@ -15,6 +17,7 @@ class Token:
         self.end_pos = end_pos
 
     def to_dict(self):
+        """Преобразование в словарь для таблицы"""
         return {
             'code': self.code,
             'type_desc': self.type_desc,
@@ -25,13 +28,18 @@ class Token:
             'end': self.end_pos
         }
 
+
 class Scanner:
+    """Лексический анализатор с фильтрацией незначащих символов"""
+
     def __init__(self):
+        # Ключевые слова и их коды
         self.keywords = {
             'if': (1, "ключевое слово if"),
             'else': (2, "ключевое слово else")
         }
 
+        # Операторы (односимвольные)
         self.operators = {
             '=': (4, "оператор присваивания"),
             '+': (11, "арифметический оператор +"),
@@ -45,6 +53,7 @@ class Scanner:
             ';': (19, "конец оператора")
         }
 
+        # Двухсимвольные операторы
         self.two_char_operators = {
             '>=': (7, "оператор сравнения >="),
             '<=': (8, "оператор сравнения <="),
@@ -52,48 +61,70 @@ class Scanner:
             '!=': (10, "оператор сравнения !=")
         }
 
+        # Односимвольные операторы сравнения
         self.compare_ops = {
             '>': (5, "оператор сравнения >"),
             '<': (6, "оператор сравнения <")
         }
 
     def is_letter(self, ch):
+        """Проверка, является ли символ буквой или подчеркиванием"""
         return ch.isalpha() or ch == '_'
 
     def is_letter_or_digit(self, ch):
+        """Проверка, является ли символ буквой, цифрой или подчеркиванием"""
         return ch.isalpha() or ch.isdigit() or ch == '_'
 
     def is_digit(self, ch):
+        """Проверка, является ли символ цифрой"""
         return ch.isdigit()
 
+    def is_whitespace(self, ch):
+        """Проверка, является ли символ незначащим (пробел, табуляция, перенос строки)"""
+        return ch in ' \t\n\r'
+
     def scan(self, text):
+        """
+        Принимает текст, возвращает (токены, ошибки)
+        Незначащие символы (пробелы, табуляции, переносы строк) игнорируются
+        """
         tokens = []
         errors = []
+
+        # Отфильтрованная строка без незначащих символов
+        filtered_text = ""
 
         i = 0
         line = 1
         line_start = 0
         n = len(text)
 
+        print("Процесс сканирования")
+
         while i < n:
             ch = text[i]
-            pos = i - line_start + 1
+            pos = i - line_start + 1  # позиция в строке (с 1)
 
+            # Отслеживание переноса строки (для подсчета строк при ошибках)
             if ch == '\n':
-                tokens.append(Token(21, "новая строка", ch, line, pos, pos))
                 line += 1
                 line_start = i + 1
                 i += 1
+                continue  # Пропускаем перевод строки
 
-            elif ch == ' ':
-                tokens.append(Token(0, "пробел", ch, line, pos, pos))
+            # Пропускаем пробелы и табуляции
+            if ch == ' ' or ch == '\t':
                 i += 1
+                continue
 
-            elif ch == '\t':
-                tokens.append(Token(20, "табуляция", ch, line, pos, pos))
-                i += 1
+            # Если дошли до этого места, значит символ значимый
+            # Добавляем его в отфильтрованную строку
+            filtered_text += ch
 
-            elif self.is_letter(ch):
+            # Обработка значимых символов
+
+            # Идентификаторы и ключевые слова
+            if self.is_letter(ch):
                 start_i = i
                 start_line = line
                 start_pos = pos
@@ -106,9 +137,12 @@ class Scanner:
                 if value in self.keywords:
                     code, desc = self.keywords[value]
                     tokens.append(Token(code, desc, value, start_line, start_pos, start_pos + len(value) - 1))
+                    print(f"Найден токен: {desc} '{value}' (строка {start_line}, поз.{start_pos})")
                 else:
                     tokens.append(Token(3, "идентификатор", value, start_line, start_pos, start_pos + len(value) - 1))
+                    print(f"Найден токен: идентификатор '{value}' (строка {start_line}, поз.{start_pos})")
 
+            # Числа
             elif self.is_digit(ch):
                 start_i = i
                 start_line = line
@@ -120,23 +154,31 @@ class Scanner:
                     i += 1
 
                 tokens.append(Token(22, "число", value, start_line, start_pos, start_pos + len(value) - 1))
+                print(f"Найден токен: число '{value}' (строка {start_line}, поз.{start_pos})")
 
-            elif i + 1 < n and text[i:i+2] in self.two_char_operators:
-                two_chars = text[i:i+2]
+            # Двухсимвольные операторы
+            elif i + 1 < n and text[i:i + 2] in self.two_char_operators:
+                two_chars = text[i:i + 2]
                 code, desc = self.two_char_operators[two_chars]
                 tokens.append(Token(code, desc, two_chars, line, pos, pos + 1))
+                print(f"Найден токен: {desc} '{two_chars}' (строка {line}, поз.{pos})")
                 i += 2
 
+            # Односимвольные операторы сравнения
             elif ch in self.compare_ops:
                 code, desc = self.compare_ops[ch]
                 tokens.append(Token(code, desc, ch, line, pos, pos))
+                print(f"Найден токен: {desc} '{ch}' (строка {line}, поз.{pos})")
                 i += 1
 
+            # Остальные операторы и разделители
             elif ch in self.operators:
                 code, desc = self.operators[ch]
                 tokens.append(Token(code, desc, ch, line, pos, pos))
+                print(f"Найден токен: {desc} '{ch}' (строка {line}, поз.{pos})")
                 i += 1
 
+            # Нераспознанный символ - ошибка
             else:
                 errors.append({
                     'line': line,
@@ -144,18 +186,27 @@ class Scanner:
                     'char': ch,
                     'message': f"Недопустимый символ '{ch}'"
                 })
+                print(f"!!! Ошибка: недопустимый символ '{ch}' (строка {line}, поз.{pos})")
                 i += 1
 
-        return tokens, errors
+        print(f"\nРезультат")
+        print(f"Исходный текст ({len(text)} символов):")
+        print(repr(text))
+        print(f"\nОтфильтрованный текст (только значимые символы, {len(filtered_text)} символов):")
+        print(filtered_text)
+        print(f"Найдено токенов: {len(tokens)}, ошибок: {len(errors)}")
+
+        return tokens, errors, filtered_text
 
     def get_table_data(self, tokens, errors):
+        """Подготовка данных для таблицы"""
         data = []
         for token in tokens:
             data.append(token.to_dict())
         for error in errors:
             data.append({
                 'code': -1,
-                'type_desc': 'ОШИБКА',
+                'type_desc': 'Ошибка',
                 'value': error['char'],
                 'location': f"строка {error['line']}, позиция {error['pos']}",
                 'line': error['line'],
@@ -166,6 +217,32 @@ class Scanner:
             })
         return data
 
+
+# Тестирование
+if __name__ == "__main__":
+    scanner = Scanner()
+
+    # Тестовый пример из задания
+    test_code = """if (a > b) {
+    max = a;
+} else {
+    max = b;
+};"""
+
+    print("Тестирование сканера с фильтрацией")
+    print("=" * 50)
+
+    tokens, errors, filtered = scanner.scan(test_code)
+
+    print("\n=== ТОКЕНЫ ===")
+    for token in tokens:
+        print(
+            f"{token.code:3d} | {token.type_desc:25} | '{token.value}' | строка {token.line}, {token.start_pos}-{token.end_pos}")
+
+    if errors:
+        print("\nОшибки")
+        for error in errors:
+            print(f"Строка {error['line']}, поз.{error['pos']}: {error['message']}")
 
 if __name__ == "__main__":
     scanner = Scanner()

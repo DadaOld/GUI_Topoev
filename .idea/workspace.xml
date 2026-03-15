@@ -6,6 +6,20 @@
   <component name="ChangeListManager">
     <list default="true" id="d210338a-96af-45c6-af8b-90215dcaf457" name="Changes" comment="Точно дописан файл README">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/README.md" beforeDir="false" afterPath="$PROJECT_DIR$/README.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/TextEditor1.spec" beforeDir="false" afterPath="$PROJECT_DIR$/TextEditor1.spec" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/build/TextEditor1/Analysis-00.toc" beforeDir="false" afterPath="$PROJECT_DIR$/build/TextEditor1/Analysis-00.toc" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/build/TextEditor1/EXE-00.toc" beforeDir="false" afterPath="$PROJECT_DIR$/build/TextEditor1/EXE-00.toc" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/build/TextEditor1/PKG-00.toc" beforeDir="false" afterPath="$PROJECT_DIR$/build/TextEditor1/PKG-00.toc" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/build/TextEditor1/PYZ-00.pyz" beforeDir="false" afterPath="$PROJECT_DIR$/build/TextEditor1/PYZ-00.pyz" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/build/TextEditor1/PYZ-00.toc" beforeDir="false" afterPath="$PROJECT_DIR$/build/TextEditor1/PYZ-00.toc" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/build/TextEditor1/TextEditor1.pkg" beforeDir="false" afterPath="$PROJECT_DIR$/build/TextEditor1/TextEditor1.pkg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/build/TextEditor1/base_library.zip" beforeDir="false" afterPath="$PROJECT_DIR$/build/TextEditor1/base_library.zip" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/build/TextEditor1/warn-TextEditor1.txt" beforeDir="false" afterPath="$PROJECT_DIR$/build/TextEditor1/warn-TextEditor1.txt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/build/TextEditor1/xref-TextEditor1.html" beforeDir="false" afterPath="$PROJECT_DIR$/build/TextEditor1/xref-TextEditor1.html" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/TextEditor1.exe" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/main.py" beforeDir="false" afterPath="$PROJECT_DIR$/main.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/scanner.py" beforeDir="false" afterPath="$PROJECT_DIR$/scanner.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -48,6 +62,7 @@
   <component name="PropertiesComponent"><![CDATA[{
   "keyToString": {
     "Python.main.executor": "Run",
+    "Python.scanner.executor": "Run",
     "RunOnceActivity.ShowReadmeOnStart": "true",
     "git-widget-placeholder": "master",
     "last_opened_file_path": "C:/Users/maksi/Python/Projects/django",
@@ -59,7 +74,7 @@
       <recent name="C:\Users\maksi\OneDrive\Рабочий стол\TextRedactor\pythonProject1\Screenshots" />
     </key>
   </component>
-  <component name="RunManager">
+  <component name="RunManager" selected="Python.main">
     <configuration name="main" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
       <module name="pythonProject1" />
       <option name="ENV_FILES" value="" />
@@ -82,9 +97,32 @@
       <option name="INPUT_FILE" value="" />
       <method v="2" />
     </configuration>
+    <configuration name="scanner" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
+      <module name="pythonProject1" />
+      <option name="ENV_FILES" value="" />
+      <option name="INTERPRETER_OPTIONS" value="" />
+      <option name="PARENT_ENVS" value="true" />
+      <envs>
+        <env name="PYTHONUNBUFFERED" value="1" />
+      </envs>
+      <option name="SDK_HOME" value="" />
+      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$" />
+      <option name="IS_MODULE_SDK" value="true" />
+      <option name="ADD_CONTENT_ROOTS" value="true" />
+      <option name="ADD_SOURCE_ROOTS" value="true" />
+      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/scanner.py" />
+      <option name="PARAMETERS" value="" />
+      <option name="SHOW_COMMAND_LINE" value="false" />
+      <option name="EMULATE_TERMINAL" value="false" />
+      <option name="MODULE_MODE" value="false" />
+      <option name="REDIRECT_INPUT" value="false" />
+      <option name="INPUT_FILE" value="" />
+      <method v="2" />
+    </configuration>
     <recent_temporary>
       <list>
         <item itemvalue="Python.main" />
+        <item itemvalue="Python.scanner" />
       </list>
     </recent_temporary>
   </component>
@@ -178,6 +216,9 @@
     </task>
     <option name="localTasksCounter" value="10" />
     <servers />
+  </component>
+  <component name="UnknownFeatures">
+    <option featureType="com.intellij.fileTypeFactory" implementationName="*.spec" />
   </component>
   <component name="Vcs.Log.Tabs.Properties">
     <option name="TAB_STATES">

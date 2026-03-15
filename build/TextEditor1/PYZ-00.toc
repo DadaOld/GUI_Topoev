@@ -255,6 +255,10 @@
   ('random',
    'C:\\Users\\maksi\\AppData\\Local\\Programs\\Python\\Python312\\Lib\\random.py',
    'PYMODULE'),
+  ('scanner',
+   'C:\\Users\\maksi\\OneDrive\\Рабочий '
+   'стол\\TextRedactor\\pythonProject1\\scanner.py',
+   'PYMODULE'),
   ('selectors',
    'C:\\Users\\maksi\\AppData\\Local\\Programs\\Python\\Python312\\Lib\\selectors.py',
    'PYMODULE'),
