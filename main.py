@@ -337,6 +337,7 @@ class TextEditor(QMainWindow):
         self.results_table.setRowCount(len(table_data))
 
         for row, item in enumerate(table_data):
+            # Код
             code_item = QTableWidgetItem(str(item['code']))
             code_item.setFlags(code_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
             if item.get('is_error', False):
@@ -344,6 +345,7 @@ class TextEditor(QMainWindow):
                 code_item.setForeground(Qt.GlobalColor.white)
             self.results_table.setItem(row, 0, code_item)
 
+            # Тип лексемы
             type_item = QTableWidgetItem(item['type_desc'])
             type_item.setFlags(type_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
             if item.get('is_error', False):
@@ -351,13 +353,18 @@ class TextEditor(QMainWindow):
                 type_item.setForeground(Qt.GlobalColor.white)
             self.results_table.setItem(row, 1, type_item)
 
-            value_item = QTableWidgetItem(repr(item['value']))
+            # Лексема
+            if item.get('is_error', False):
+                value_item = QTableWidgetItem(item['value'])
+            else:
+                value_item = QTableWidgetItem(repr(item['value']))
             value_item.setFlags(value_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
             if item.get('is_error', False):
                 value_item.setBackground(Qt.GlobalColor.red)
                 value_item.setForeground(Qt.GlobalColor.white)
             self.results_table.setItem(row, 2, value_item)
 
+            # Местоположение
             loc_item = QTableWidgetItem(item['location'])
             loc_item.setFlags(loc_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
             if item.get('is_error', False):
@@ -365,18 +372,17 @@ class TextEditor(QMainWindow):
                 loc_item.setForeground(Qt.GlobalColor.white)
             self.results_table.setItem(row, 3, loc_item)
 
-            if not item.get('is_error', False):
-                item['is_error'] = False
+            # Сохраняем данные для навигации
             self.results_table.item(row, 0).setData(Qt.ItemDataRole.UserRole, item)
 
         self.results_table.resizeColumnsToContents()
         self.results_table.horizontalHeader().setStretchLastSection(True)
 
-        self.output_area.append(f"Найдено токенов: {len(tokens)}")
-        self.output_area.append(f"Ошибок: {len(errors)}")
-        self.output_area.append("\nАнализ завершен")
+        self.output_area.append(f"найдено токенов: {len(tokens)}")
+        self.output_area.append(f"всего ошибок: {len(errors)}")
+        self.output_area.append("\nанализ завершен")
 
-        self.statusBar().showMessage(f"Анализ завершен. Найдено токенов: {len(tokens)}, Ошибок: {len(errors)}", 3000)
+        self.statusBar().showMessage(f"анализ завершен. токенов: {len(tokens)}, ошибок: {len(errors)}", 3000)
 
     def on_table_item_clicked(self, item):
         row = item.row()

@@ -199,15 +199,17 @@ class Scanner:
         return tokens, errors, filtered_text
 
     def get_table_data(self, tokens, errors):
-        """Подготовка данных для таблицы"""
         data = []
+
         for token in tokens:
             data.append(token.to_dict())
+
         for error in errors:
+            char = error['char']
             data.append({
                 'code': -1,
-                'type_desc': 'Ошибка',
-                'value': error['char'],
+                'type_desc': 'ошибка',
+                'value': char,  # просто символ, без экранирования
                 'location': f"строка {error['line']}, позиция {error['pos']}",
                 'line': error['line'],
                 'start': error['pos'],
@@ -215,6 +217,7 @@ class Scanner:
                 'is_error': True,
                 'message': error['message']
             })
+
         return data
 
 
