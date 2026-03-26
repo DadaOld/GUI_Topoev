@@ -233,11 +233,10 @@ if __name__ == "__main__":
 };"""
 
     print("Тестирование сканера с фильтрацией")
-    print("=" * 50)
 
     tokens, errors, filtered = scanner.scan(test_code)
 
-    print("\n=== ТОКЕНЫ ===")
+    print("\nТокены")
     for token in tokens:
         print(
             f"{token.code:3d} | {token.type_desc:25} | '{token.value}' | строка {token.line}, {token.start_pos}-{token.end_pos}")
@@ -246,12 +245,3 @@ if __name__ == "__main__":
         print("\nОшибки")
         for error in errors:
             print(f"Строка {error['line']}, поз.{error['pos']}: {error['message']}")
-
-if __name__ == "__main__":
-    scanner = Scanner()
-    test = "if (a > b) {\n    max = a;\n}"
-    tokens, errors = scanner.scan(test)
-    for t in tokens:
-        print(f"{t.code}: {t.value} - {t.type_desc} [строка {t.line}, {t.start_pos}-{t.end_pos}]")
-    for e in errors:
-        print(f"Ошибка: {e['message']} в строке {e['line']}, позиция {e['pos']}")
