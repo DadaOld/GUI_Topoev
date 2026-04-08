@@ -10,6 +10,7 @@ from PyQt6.QtGui import QAction, QIcon, QTextCursor
 from PyQt6.QtCore import Qt, QSize
 
 from scanner import Scanner
+from parser import parse_tokens
 
 
 class TextEditor(QMainWindow):
@@ -322,17 +323,68 @@ class TextEditor(QMainWindow):
             return
 
         self.clear_results()
+        self.output_area.clear()
 
-        self.output_area.append("Запуск лексического анализатора\n")
+        # Лексический анализ
+        tokens, lex_errors, filtered_text = self.scanner.scan(text)
 
-        # Запускаем сканер (теперь он возвращает еще и отфильтрованный текст)
-        tokens, errors, filtered_text = self.scanner.scan(text)
-        table_data = self.scanner.get_table_data(tokens, errors)
+        # Синтаксический анализ
+        syntax_errors = []
+        parse_success = True
 
-        # Выводим отфильтрованный текст
-        self.output_area.append("Текст после удаления незначащих символов:")
-        self.output_area.append(filtered_text)
-        self.output_area.append("-" * 50)
+        if tokens:
+            try:
+                parse_success, syntax_errors = parse_tokens(tokens, len(lex_errors) > 0)
+            except Exception as e:
+                self.output_area.append(f"Ошибка парсера: {e}")
+                syntax_errors = []
+
+        # Проверка ошибок
+        total_errors = len(lex_errors) + len(syntax_errors)
+
+        if total_errors == 0:
+            self.output_area.append("Анализ успешно завершен.")
+            self.output_area.append(f"Токенов: {len(tokens)}")
+            self.output_area.append("Ошибок не найдено.")
+        else:
+            self.output_area.append("Анализ завершен с ошибками.")
+
+            if lex_errors:
+                self.output_area.append("\nЛексические ошибки:")
+                for err in lex_errors:
+                    line = err.get('line', 1)
+                    pos = err.get('pos_start', 1)
+                    char = err.get('char', '?')
+                    msg = err.get('message', 'неизвестная ошибка')
+                    self.output_area.append(f"  строка {line}, позиция {pos}: '{char}' - {msg}")
+
+            if syntax_errors:
+                self.output_area.append("\nСинтаксические ошибки:")
+                for err in syntax_errors:
+                    line = err.line
+                    pos = err.pos
+                    fragment = err.fragment
+                    msg = err.message
+                    self.output_area.append(f"  строка {line}, позиция {pos}: '{fragment}' - {msg}")
+
+            self.output_area.append(
+                f"\nВсего ошибок: {total_errors} (лексических: {len(lex_errors)}, синтаксических: {len(syntax_errors)})")
+
+        # Заполнение таблицы
+        table_data = self.scanner.get_table_data(tokens, lex_errors)
+
+        for err in syntax_errors:
+            table_data.append({
+                'code': -1,
+                'type_desc': 'синтаксическая ошибка',
+                'value': err.fragment,
+                'location': f"строка {err.line}, {err.pos}-{err.pos}",
+                'line': err.line,
+                'start': err.pos,
+                'end': err.pos,
+                'is_error': True,
+                'message': err.message
+            })
 
         self.results_table.setRowCount(len(table_data))
 
@@ -372,17 +424,15 @@ class TextEditor(QMainWindow):
                 loc_item.setForeground(Qt.GlobalColor.white)
             self.results_table.setItem(row, 3, loc_item)
 
-            # Сохраняем данные для навигации
             self.results_table.item(row, 0).setData(Qt.ItemDataRole.UserRole, item)
 
         self.results_table.resizeColumnsToContents()
         self.results_table.horizontalHeader().setStretchLastSection(True)
 
-        self.output_area.append(f"найдено токенов: {len(tokens)}")
-        self.output_area.append(f"всего ошибок: {len(errors)}")
-        self.output_area.append("\nанализ завершен")
-
-        self.statusBar().showMessage(f"анализ завершен. токенов: {len(tokens)}, ошибок: {len(errors)}", 3000)
+        self.statusBar().showMessage(
+            f"Анализ завершен. Токенов: {len(tokens)}, ошибок: {total_errors}",
+            5000
+        )
 
     def on_table_item_clicked(self, item):
         row = item.row()
@@ -394,7 +444,10 @@ class TextEditor(QMainWindow):
                 start = token_data.get('start', 1)
                 self.go_to_position(line, start)
                 if token_data.get('is_error', False):
-                    self.statusBar().showMessage(f"Ошибка: {token_data.get('message', 'Неизвестная ошибка')}", 3000)
+                    self.statusBar().showMessage(
+                        f"{'Лексическая' if token_data.get('is_lexical', True) else 'Синтаксическая'} ошибка: {token_data.get('message', 'Неизвестная ошибка')}",
+                        3000
+                    )
 
     def go_to_position(self, line, column):
         cursor = self.editor.textCursor()
@@ -441,14 +494,15 @@ class TextEditor(QMainWindow):
             <li><b>Вырезать (Ctrl+X), Копировать (Ctrl+C), Вставить (Ctrl+V)</b></li>
             <li><b>Удалить (Del), Выделить все (Ctrl+A)</b></li>
         </ul>
-        <p><b>Меню "Пуск" (F5):</b> запускает лексический анализатор.</p>
+        <p><b>Меню "Пуск" (F5):</b> запускает лексический и синтаксический анализаторы.</p>
 
         <h3>Особенности работы:</h3>
         <ul>
             <li><b>Незначащие символы</b> (пробелы, табуляции, переносы строк) автоматически удаляются</li>
             <li><b>Отфильтрованный текст</b> отображается в области вывода</li>
             <li><b>Навигация:</b> клик по строке таблицы перемещает курсор на соответствующую позицию</li>
-            <li><b>Ошибки</b> выделяются красным цветом в таблице</li>
+            <li><b>Лексические ошибки</b> выделяются красным цветом в таблице</li>
+            <li><b>Синтаксические ошибки</b> также отображаются в таблице</li>
         </ul>
 
         <h3>Коды лексем:</h3>
@@ -473,6 +527,9 @@ class TextEditor(QMainWindow):
             <li><b>18</b> - закрывающая фигурная скобка }</li>
             <li><b>19</b> - конец оператора ;</li>
             <li><b>22</b> - число</li>
+            <li><b>23</b> - логическое И (&&, and)</li>
+            <li><b>24</b> - логическое ИЛИ (||, or)</li>
+            <li><b>25</b> - логическое НЕ (!, not)</li>
             <li><b>-1</b> - ошибка</li>
         </ul>
         """
