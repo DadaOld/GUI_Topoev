@@ -12,75 +12,21 @@ from PyQt6.QtCore import Qt, QSize
 
 
 class VisaCardAutomaton:
-    """
-    Детерминированный конечный автомат для распознавания номеров карт Visa.
-
-    Правила:
-    - Начинается с границы слова (перед номером не цифра/разделитель)
-    - Первая цифра: '4'
-    - Затем 12 цифр (в сумме 13)
-    - Опционально еще 0, 1 или 2 группы по 3 цифры (длина 13, 16 или 19)
-    - Поддерживаются разделители: пробел и дефис
-    - Заканчивается границей слова (после номера не цифра/разделитель)
-
-    Состояния автомата:
-    0 - начальное состояние (ожидание границы)
-    1 - найдена граница (ожидание '4')
-    2 - найдена '4' (ожидание 12 цифр)
-    3-14 - подсчет 12 обязательных цифр
-    15 - принимающее (13 цифр)
-    16-17 - подсчет дополнительных 3 цифр
-    18 - принимающее (16 цифр)
-    19-20 - подсчет дополнительных 3 цифр
-    21 - принимающее (19 цифр)
-    """
+    """Автомат для номеров Visa (13, 16, 18, 19 цифр) со строгой проверкой формата."""
 
     def __init__(self):
-        # Состояния автомата
-        self.STATE_START = 0
-        self.STATE_BOUNDARY = 1
-        self.STATE_FIRST_4 = 2
-        # Состояния подсчета 12 цифр (3-14)
-        self.STATE_ACCEPT_13 = 15
-        self.STATE_GROUP1_1 = 16
-        self.STATE_GROUP1_2 = 17
-        self.STATE_ACCEPT_16 = 18
-        self.STATE_GROUP2_1 = 19
-        self.STATE_GROUP2_2 = 20
-        self.STATE_ACCEPT_19 = 21
-
-        # Принимающие состояния
-        self.accepting_states = {
-            self.STATE_ACCEPT_13,
-            self.STATE_ACCEPT_16,
-            self.STATE_ACCEPT_19
-        }
-
         self.reset()
 
     def reset(self):
-        """Сброс автомата в начальное состояние"""
-        self.current_state = self.STATE_START
+        self.state = 0
         self.digit_count = 0
         self.match_start = -1
-        self.potential_start = -1
-        self.in_match = False
+        self.chars_since_space = 0  # Счетчик символов после последнего пробела
 
     def is_digit(self, char):
-        """Проверка, является ли символ цифрой"""
         return '0' <= char <= '9'
 
-    def is_separator(self, char):
-        """Проверка, является ли символ разделителем"""
-        return char in ' -'
-
     def find_all_matches(self, text):
-        """
-        Поиск всех совпадений в тексте с помощью конечного автомата.
-
-        Returns:
-            list: список словарей с ключами 'text', 'start', 'length'
-        """
         matches = []
         self.reset()
 
@@ -88,199 +34,86 @@ class VisaCardAutomaton:
         while i < len(text):
             char = text[i]
 
-            if self.current_state == self.STATE_START:
-                # Ищем границу перед номером
-                if not self.is_digit(char) and not self.is_separator(char):
-                    self.current_state = self.STATE_BOUNDARY
-                    self.potential_start = i + 1
-                i += 1
-
-            elif self.current_state == self.STATE_BOUNDARY:
-                # Ожидаем первую цифру '4'
-                if char == '4':
-                    self.current_state = self.STATE_FIRST_4
+            if self.state == 0:
+                # Ищем начало: '4' и перед ней не цифра
+                if char == '4' and (i == 0 or not text[i - 1].isdigit()):
+                    self.state = 1
                     self.digit_count = 1
                     self.match_start = i
-                    i += 1
-                elif not self.is_digit(char) and not self.is_separator(char):
-                    self.potential_start = i + 1
-                    i += 1
-                else:
-                    self.current_state = self.STATE_START
-                    i += 1
-
-            elif self.current_state == self.STATE_FIRST_4:
-                # Первая цифра уже '4', ждем остальные 11 цифр
-                if self.is_digit(char):
-                    self.digit_count += 1
-                    if self.digit_count == 13:
-                        self.current_state = self.STATE_ACCEPT_13
-                    else:
-                        # Состояния 3-14
-                        self.current_state = 2 + self.digit_count
-                    i += 1
-                elif self.is_separator(char):
-                    i += 1
-                else:
-                    # Встретили не цифру и не разделитель - сброс
-                    self.current_state = self.STATE_START
-                    if not self.is_digit(char) and not self.is_separator(char):
-                        self.current_state = self.STATE_BOUNDARY
-                        self.potential_start = i + 1
-                    i += 1
-
-            elif 3 <= self.current_state <= 14:
-                # Подсчет 12 цифр после первой
-                if self.is_digit(char):
-                    self.digit_count += 1
-                    if self.digit_count == 13:
-                        self.current_state = self.STATE_ACCEPT_13
-                    else:
-                        self.current_state = 2 + self.digit_count
-                    i += 1
-                elif self.is_separator(char):
-                    i += 1
-                else:
-                    self.current_state = self.STATE_START
-                    if not self.is_digit(char) and not self.is_separator(char):
-                        self.current_state = self.STATE_BOUNDARY
-                        self.potential_start = i + 1
-                    i += 1
-
-            elif self.current_state == self.STATE_ACCEPT_13:
-                # Проверяем, не продолжается ли номер (может быть 16 цифр)
-                if self.is_digit(char):
-                    self.digit_count += 1
-                    self.current_state = self.STATE_GROUP1_1
-                    i += 1
-                elif self.is_separator(char):
-                    i += 1
-                else:
-                    # Принимаем как 13-значный номер
-                    matched_text = text[self.match_start:i]
-                    matches.append({
-                        'text': matched_text,
-                        'start': self.match_start,
-                        'length': len(matched_text)
-                    })
-                    self.reset()
-                    if not self.is_digit(char) and not self.is_separator(char):
-                        self.current_state = self.STATE_BOUNDARY
-                        self.potential_start = i + 1
-                    i += 1
-
-            elif self.current_state == self.STATE_GROUP1_1:
-                if self.is_digit(char):
-                    self.digit_count += 1
-                    self.current_state = self.STATE_GROUP1_2
-                    i += 1
-                elif self.is_separator(char):
-                    i += 1
-                else:
-                    # 14 цифр - невалидно, сброс
-                    self.current_state = self.STATE_START
-                    if not self.is_digit(char) and not self.is_separator(char):
-                        self.current_state = self.STATE_BOUNDARY
-                        self.potential_start = i + 1
-                    i += 1
-
-            elif self.current_state == self.STATE_GROUP1_2:
-                if self.is_digit(char):
-                    self.digit_count += 1
-                    self.current_state = self.STATE_ACCEPT_16
-                    i += 1
-                elif self.is_separator(char):
-                    i += 1
-                else:
-                    # 15 цифр - невалидно, сброс
-                    self.current_state = self.STATE_START
-                    if not self.is_digit(char) and not self.is_separator(char):
-                        self.current_state = self.STATE_BOUNDARY
-                        self.potential_start = i + 1
-                    i += 1
-
-            elif self.current_state == self.STATE_ACCEPT_16:
-                # Проверяем, не продолжается ли номер (может быть 19 цифр)
-                if self.is_digit(char):
-                    self.digit_count += 1
-                    self.current_state = self.STATE_GROUP2_1
-                    i += 1
-                elif self.is_separator(char):
-                    i += 1
-                else:
-                    # Принимаем как 16-значный номер
-                    matched_text = text[self.match_start:i]
-                    matches.append({
-                        'text': matched_text,
-                        'start': self.match_start,
-                        'length': len(matched_text)
-                    })
-                    self.reset()
-                    if not self.is_digit(char) and not self.is_separator(char):
-                        self.current_state = self.STATE_BOUNDARY
-                        self.potential_start = i + 1
-                    i += 1
-
-            elif self.current_state == self.STATE_GROUP2_1:
-                if self.is_digit(char):
-                    self.digit_count += 1
-                    self.current_state = self.STATE_GROUP2_2
-                    i += 1
-                elif self.is_separator(char):
-                    i += 1
-                else:
-                    # 17 цифр - невалидно, сброс
-                    self.current_state = self.STATE_START
-                    if not self.is_digit(char) and not self.is_separator(char):
-                        self.current_state = self.STATE_BOUNDARY
-                        self.potential_start = i + 1
-                    i += 1
-
-            elif self.current_state == self.STATE_GROUP2_2:
-                if self.is_digit(char):
-                    self.digit_count += 1
-                    self.current_state = self.STATE_ACCEPT_19
-                    i += 1
-                elif self.is_separator(char):
-                    i += 1
-                else:
-                    # 18 цифр - невалидно, сброс
-                    self.current_state = self.STATE_START
-                    if not self.is_digit(char) and not self.is_separator(char):
-                        self.current_state = self.STATE_BOUNDARY
-                        self.potential_start = i + 1
-                    i += 1
-
-            elif self.current_state == self.STATE_ACCEPT_19:
-                if self.is_digit(char):
-                    # Больше 19 цифр - невалидно, сброс
-                    self.current_state = self.STATE_START
-                    i += 1
-                elif self.is_separator(char):
-                    i += 1
-                else:
-                    # Принимаем как 19-значный номер
-                    matched_text = text[self.match_start:i]
-                    matches.append({
-                        'text': matched_text,
-                        'start': self.match_start,
-                        'length': len(matched_text)
-                    })
-                    self.reset()
-                    if not self.is_digit(char) and not self.is_separator(char):
-                        self.current_state = self.STATE_BOUNDARY
-                        self.potential_start = i + 1
-                    i += 1
-            else:
+                    self.chars_since_space = 1
                 i += 1
 
+            elif self.state == 1:
+                if self.is_digit(char):
+                    self.digit_count += 1
+                    self.chars_since_space += 1
+                    i += 1
+                elif char == ' ':
+                    # Пробел допустим только после группы цифр
+                    # Проверяем формат в зависимости от текущего количества цифр
+                    if self.digit_count == 4:
+                        # После первых 4 цифр пробел допустим всегда
+                        self.chars_since_space = 0
+                        i += 1
+                    elif self.digit_count == 10 and self.chars_since_space == 6:
+                        # Для 13 цифр: после 10 цифр пробел (формат 4-6-3)
+                        self.chars_since_space = 0
+                        i += 1
+                    elif self.digit_count == 8 and self.chars_since_space == 4:
+                        # Для 16 цифр: после 8 цифр пробел
+                        self.chars_since_space = 0
+                        i += 1
+                    elif self.digit_count == 12 and self.chars_since_space == 4:
+                        # Для 16 цифр: после 12 цифр пробел
+                        self.chars_since_space = 0
+                        i += 1
+                    elif self.digit_count == 10 and self.chars_since_space == 6:
+                        # Для 18 цифр: после 10 цифр пробел
+                        self.chars_since_space = 0
+                        i += 1
+                    elif self.digit_count == 16 and self.chars_since_space == 6:
+                        # Для 18 цифр: после 16 цифр пробел
+                        self.chars_since_space = 0
+                        i += 1
+                    elif self.digit_count == 16 and self.chars_since_space == 4:
+                        # Для 19 цифр: после 16 цифр пробел
+                        self.chars_since_space = 0
+                        i += 1
+                    else:
+                        # Пробел в неположенном месте — сброс
+                        if self.digit_count in (13, 16, 18, 19):
+                            matches.append({
+                                'text': text[self.match_start:i],
+                                'start': self.match_start,
+                                'length': i - self.match_start
+                            })
+                        self.state = 0
+                        self.digit_count = 0
+                        # Не увеличиваем i, проверяем текущий символ заново
+                else:
+                    # Встретили не цифру и не пробел
+                    if self.digit_count in (13, 16, 18, 19):
+                        matches.append({
+                            'text': text[self.match_start:i],
+                            'start': self.match_start,
+                            'length': i - self.match_start
+                        })
+                    self.state = 0
+                    self.digit_count = 0
+                    # Проверяем, может это начало нового номера
+                    if char == '4':
+                        self.state = 1
+                        self.digit_count = 1
+                        self.match_start = i
+                        self.chars_since_space = 1
+                    i += 1
+
         # Проверка в конце текста
-        if self.current_state in self.accepting_states:
-            matched_text = text[self.match_start:len(text)]
+        if self.state == 1 and self.digit_count in (13, 16, 18, 19):
             matches.append({
-                'text': matched_text,
+                'text': text[self.match_start:len(text)],
                 'start': self.match_start,
-                'length': len(matched_text)
+                'length': len(text) - self.match_start
             })
 
         return matches
@@ -302,33 +135,6 @@ class TextEditor(QMainWindow):
         main_layout = QVBoxLayout(central_widget)
         main_layout.setContentsMargins(5, 5, 5, 5)
 
-        # Панель управления поиском
-        search_panel = QWidget()
-        search_layout = QHBoxLayout(search_panel)
-        search_layout.setContentsMargins(0, 0, 0, 0)
-
-        search_layout.addWidget(QLabel("Тип поиска:"))
-
-        self.search_type_combo = QComboBox()
-        self.search_type_combo.addItems([
-            "Числа (целые и с плавающей точкой)",
-            "Номера карт Visa (автомат)",
-            "IPv6 адрес с префиксом"
-        ])
-        self.search_type_combo.setMinimumWidth(280)
-        search_layout.addWidget(self.search_type_combo)
-
-        self.search_button = QPushButton("🔍 Найти")
-        self.search_button.clicked.connect(self.perform_search)
-        search_layout.addWidget(self.search_button)
-
-        self.result_count_label = QLabel("Найдено: 0")
-        search_layout.addWidget(self.result_count_label)
-
-        search_layout.addStretch()
-        main_layout.addWidget(search_panel)
-
-        # Основной разделитель
         main_splitter = QSplitter(Qt.Orientation.Vertical)
 
         self.editor = QTextEdit()
@@ -336,7 +142,6 @@ class TextEditor(QMainWindow):
         self.editor.document().modificationChanged.connect(self.setWindowModified)
         main_splitter.addWidget(self.editor)
 
-        # Нижняя часть с результатами
         bottom_widget = QWidget()
         bottom_layout = QVBoxLayout(bottom_widget)
         bottom_layout.setContentsMargins(0, 0, 0, 0)
@@ -352,6 +157,7 @@ class TextEditor(QMainWindow):
         self.results_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
         self.results_table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self.results_table.setSelectionMode(QTableWidget.SelectionMode.SingleSelection)
+        self.results_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         self.results_table.itemSelectionChanged.connect(self.highlight_selected_match)
         results_layout.addWidget(self.results_table)
 
@@ -367,12 +173,14 @@ class TextEditor(QMainWindow):
         main_splitter.setSizes([500, 300])
         main_layout.addWidget(main_splitter)
 
+        self.result_count_label = QLabel("Найдено: 0")
+        self.statusBar().addPermanentWidget(self.result_count_label)
+
         self.create_menus()
         self.create_toolbar()
         self.statusBar().showMessage("Готов к работе")
 
     def perform_search(self):
-        """Выполняет поиск по выбранному типу"""
         text = self.editor.toPlainText()
 
         self.clear_highlighting()
@@ -393,12 +201,11 @@ class TextEditor(QMainWindow):
         try:
             matches = []
 
-            if search_type == 1:  # Visa через автомат (доп. задание)
+            if search_type == 3:
                 automaton = VisaCardAutomaton()
                 matches = automaton.find_all_matches(text)
                 self.output_area.append("Метод поиска: Конечный автомат (ДКА)")
-                self.output_area.append("Состояния автомата: 22")
-                self.output_area.append("Принимающие состояния: 15 (13 цифр), 18 (16 цифр), 21 (19 цифр)")
+                self.output_area.append("Состояния: 0-21, принимающие: 15, 18, 21")
             else:
                 patterns = self.get_regex_patterns()
                 pattern = patterns[search_type]
@@ -453,15 +260,21 @@ class TextEditor(QMainWindow):
             self.result_count_label.setText("Ошибка")
 
     def get_regex_patterns(self):
-        """Возвращает список регулярных выражений для вариантов"""
         return [
-            # Вариант 21: Числа (целые и с плавающей точкой, разделитель запятая)
-            r'(?<![,\d])\b\d+(?:,\d+)?\b(?![,\d])',
+            # Числа
+            r'(?<![,.\d!?\-])(?<!\d)\d+(?:,\d+)?(?![\d!?\-])(?![,.\d!?\-])',
 
-            # Вариант 5: Номера карт Visa (используется автомат, РВ для справки)
-            r'(?<![-\s\d])4(?:[\s-]?\d){12}(?:(?:[\s-]?\d{3}){0,2})?(?![-\s\d])',
+            # Visa (РВ) - 13, 16, 18, 19 цифр
+            r'\b4\d{18}\b|'  # 19 цифр слитно
+            r'\b4\d{3} \d{4} \d{4} \d{4} \d{3}\b|'  # 19 цифр с пробелами
+            r'\b4\d{17}\b|'  # 18 цифр слитно
+            r'\b4\d{3} \d{6} \d{6}\b|'  # 18 цифр с пробелами
+            r'\b4\d{15}\b|'  # 16 цифр слитно
+            r'\b4\d{3} \d{4} \d{4} \d{4}\b|'  # 16 цифр с пробелами
+            r'\b4\d{12}\b|'  # 13 цифр слитно
+            r'\b4\d{3} \d{6} \d{3}\b',  # 13 цифр с пробелами
 
-            # Вариант 3: IPv6 адрес с префиксом (/0 - /128)
+            # IPv6
             r'(?<![0-9A-Fa-f:])((?:[0-9A-Fa-f]{1,4}:){7}[0-9A-Fa-f]{1,4}|'
             r'(?:[0-9A-Fa-f]{1,4}:){1,7}:|'
             r'(?:[0-9A-Fa-f]{1,4}:){1,6}:[0-9A-Fa-f]{1,4}|'
@@ -470,12 +283,14 @@ class TextEditor(QMainWindow):
             r'(?:[0-9A-Fa-f]{1,4}:){1,3}(?::[0-9A-Fa-f]{1,4}){1,4}|'
             r'(?:[0-9A-Fa-f]{1,4}:){1,2}(?::[0-9A-Fa-f]{1,4}){1,5}|'
             r'[0-9A-Fa-f]{1,4}:(?::[0-9A-Fa-f]{1,4}){1,6}|'
-            r':(?::[0-9A-Fa-f]{1,4}){1,7})'
+            r':(?::[0-9A-Fa-f]{1,4}){1,7}|'
+            r'::ffff:(?:[0-9]{1,3}\.){3}[0-9]{1,3}|'
+            r'::|'
+            r'::1)'
             r'/([0-9]|[1-9][0-9]|1[0-1][0-9]|12[0-8])(?![0-9])'
         ]
 
     def get_line_column(self, text, position):
-        """Вычисляет номер строки и столбца по абсолютной позиции"""
         line_num = text.count('\n', 0, position) + 1
         last_newline = text.rfind('\n', 0, position)
         if last_newline == -1:
@@ -485,7 +300,6 @@ class TextEditor(QMainWindow):
         return line_num, col_num
 
     def highlight_selected_match(self):
-        """Подсвечивает выбранное совпадение в редакторе"""
         selected_row = self.results_table.currentRow()
         if selected_row < 0 or selected_row >= len(self.search_results):
             return
@@ -509,7 +323,6 @@ class TextEditor(QMainWindow):
         self.editor.ensureCursorVisible()
 
     def clear_highlighting(self):
-        """Очищает всю подсветку в редакторе"""
         cursor = self.editor.textCursor()
         cursor.select(QTextCursor.SelectionType.Document)
         format_clear = QTextCharFormat()
@@ -590,17 +403,9 @@ class TextEditor(QMainWindow):
         edit_menu.addAction(select_all_action)
 
         text_menu = menubar.addMenu("Текст")
-
-        text_items = [
-            "Постановка задачи",
-            "Грамматика",
-            "Классификация грамматики",
-            "Метод анализа",
-            "Тестовый пример",
-            "Список литературы",
-            "Исходный код программы"
-        ]
-
+        text_items = ["Постановка задачи", "Грамматика", "Классификация грамматики",
+                      "Метод анализа", "Тестовый пример", "Список литературы",
+                      "Исходный код программы"]
         for item_text in text_items:
             action = QAction(item_text, self)
             action.triggered.connect(lambda checked, text=item_text: self.show_text_info(text))
@@ -613,14 +418,11 @@ class TextEditor(QMainWindow):
         run_menu.addAction(self.run_action)
 
         help_menu = menubar.addMenu("Справка")
-
         self.help_action = QAction("Вызов справки", self)
         self.help_action.setShortcut("F1")
         self.help_action.triggered.connect(self.show_help)
         help_menu.addAction(self.help_action)
-
         help_menu.addSeparator()
-
         self.about_action = QAction("О программе", self)
         self.about_action.triggered.connect(self.show_about)
         help_menu.addAction(self.about_action)
@@ -674,7 +476,7 @@ class TextEditor(QMainWindow):
 
         toolbar.addSeparator()
 
-        run_tb = QAction(load_icon("run.png"), "Найти", self)
+        run_tb = QAction(load_icon("run.png"), "Пуск (F5)", self)
         run_tb.triggered.connect(self.perform_search)
         toolbar.addAction(run_tb)
 
@@ -687,6 +489,20 @@ class TextEditor(QMainWindow):
         about_tb = QAction(load_icon("info.png"), "О программе", self)
         about_tb.triggered.connect(self.show_about)
         toolbar.addAction(about_tb)
+
+        toolbar.addSeparator()
+
+        toolbar.addWidget(QLabel("  Поиск: "))
+        self.search_type_combo = QComboBox()
+        self.search_type_combo.addItems([
+            "Числа",
+            "Visa (РВ)",
+            "IPv6",
+            "[ДОП] Visa (автомат)"
+        ])
+        self.search_type_combo.setMinimumWidth(160)
+        toolbar.addWidget(self.search_type_combo)
+
 
     def new_file(self):
         if self.maybe_save():
@@ -701,8 +517,13 @@ class TextEditor(QMainWindow):
 
     def open_file(self):
         if self.maybe_save():
+            test_files_path = os.path.join(os.getcwd(), "TestFiles")
+            if not os.path.exists(test_files_path):
+                test_files_path = os.getcwd()
+
             file_path, _ = QFileDialog.getOpenFileName(
-                self, "Открыть файл", "", "Текстовые файлы (*.txt);;Все файлы (*.*)"
+                self, "Открыть файл", test_files_path,
+                "Текстовые файлы (*.txt);;Все файлы (*.*)"
             )
             if file_path:
                 try:
@@ -710,8 +531,7 @@ class TextEditor(QMainWindow):
                         content = f.read()
                     self.editor.setPlainText(content)
                     self.current_file = file_path
-                    self.setWindowTitle(
-                        f"{os.path.basename(file_path)} - Лабораторная работа 4. Поиск подстрок с РВ[*]")
+                    self.setWindowTitle(f"{os.path.basename(file_path)} - Лабораторная работа 4. Поиск подстрок с РВ[*]")
                     self.setWindowModified(False)
                     self.statusBar().showMessage(f"Файл загружен: {file_path}")
                     self.output_area.append(f"# Файл загружен: {file_path}\n")
@@ -776,17 +596,12 @@ class TextEditor(QMainWindow):
         dialog.setWindowTitle(title)
         dialog.setMinimumWidth(400)
         layout = QVBoxLayout(dialog)
-
-        label = QLabel(f"<b>{title}</b>\n\nЭтот раздел будет реализован в следующих лабораторных работах.\n\n"
-                       f"Здесь будет размещена информация о грамматике, методе анализа и т.д.")
+        label = QLabel(f"<b>{title}</b>\n\nЭтот раздел будет реализован в следующих лабораторных работах.")
         label.setWordWrap(True)
-        label.setTextFormat(Qt.TextFormat.RichText)
         layout.addWidget(label)
-
         button_box = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok)
         button_box.accepted.connect(dialog.accept)
         layout.addWidget(button_box)
-
         dialog.exec()
 
     def show_help(self):
@@ -796,17 +611,11 @@ class TextEditor(QMainWindow):
         <p><b>Доступные типы поиска:</b></p>
         <ul>
             <li><b>Числа:</b> целые и с плавающей точкой (разделитель запятая)</li>
-            <li><b>Номера карт Visa:</b> 13, 16 или 19 цифр, начинаются с 4 (реализовано через конечный автомат)</li>
-            <li><b>IPv6 адрес с префиксом:</b> формат x:x:x:x:x:x:x:x/0-128</li>
+            <li><b>Visa (РВ):</b> номера карт Visa через регулярное выражение</li>
+            <li><b>IPv6:</b> адреса с префиксом /0-/128</li>
+            <li><b>[ДОП] Visa (автомат):</b> номера карт Visa через конечный автомат</li>
         </ul>
-        <p><b>Использование:</b></p>
-        <ol>
-            <li>Введите или загрузите текст в редактор</li>
-            <li>Выберите тип поиска из выпадающего списка</li>
-            <li>Нажмите кнопку "Найти" или F5</li>
-            <li>Результаты отобразятся в таблице</li>
-            <li>При выборе строки в таблице соответствующая подстрока подсветится в тексте</li>
-        </ol>
+        <p><b>Горячие клавиши:</b> F5 - запуск поиска</p>
         """
         self.output_area.setHtml(help_text)
 
@@ -817,10 +626,10 @@ class TextEditor(QMainWindow):
             "<b>Лабораторная работа 4</b><br>"
             "Реализация алгоритма поиска подстрок с помощью регулярных выражений<br><br>"
             "<b>Варианты:</b><br>"
-            "• Блок 1, Вариант 21: Числа (целые и с плавающей точкой)<br>"
-            "• Блок 2, Вариант 5: Номера карт Visa (автомат)<br>"
+            "• Блок 1, Вариант 21: Числа<br>"
+            "• Блок 2, Вариант 5: Номера карт Visa<br>"
             "• Блок 3, Вариант 3: IPv6 адрес с префиксом<br><br>"
-            "<b>Дополнительное задание:</b> реализация поиска номеров Visa через конечный автомат<br><br>"
+            "<b>Дополнительное задание:</b> поиск Visa через конечный автомат<br><br>"
             "<b>Автор:</b> Топоев Максим<br>"
             "<b>Группа:</b> АП-327<br>"
             "<b>Год:</b> 2026"
