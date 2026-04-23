@@ -15,7 +15,6 @@ class SyntaxError:
 
 
 class Parser:
-    # Коды токенов (должны совпадать со scanner.py)
     TOK_IF = 1
     TOK_ELSE = 2
     TOK_ID = 3
@@ -26,10 +25,6 @@ class Parser:
     TOK_LE = 8
     TOK_EQ = 9
     TOK_NE = 10
-    TOK_PLUS = 11
-    TOK_MINUS = 12
-    TOK_MUL = 13
-    TOK_DIV = 14
     TOK_LPAREN = 15
     TOK_RPAREN = 16
     TOK_LBRACE = 17
@@ -40,10 +35,10 @@ class Parser:
     TOK_OR = 24
     TOK_NOT = 25
 
-    # Множества для проверок
     COMPARE_OPS = {TOK_GT, TOK_LT, TOK_GE, TOK_LE, TOK_EQ, TOK_NE}
     LOGICAL_OPS = {TOK_AND, TOK_OR}
     NOT_OPS = {TOK_NOT}
+    SYNC_TOKENS = {TOK_IF, TOK_ELSE, TOK_LBRACE, TOK_RBRACE, TOK_SEMICOLON, TOK_RPAREN}
 
     def __init__(self, tokens, has_lexical_errors=False):
         self.tokens = tokens
@@ -51,19 +46,36 @@ class Parser:
         self.errors = []
         self.total_tokens = len(tokens)
         self.has_lexical_errors = has_lexical_errors
+        self.in_error_recovery = False
 
     def current_token(self):
         if self.position < self.total_tokens:
             return self.tokens[self.position]
         return None
 
+    def prev_token(self):
+        if self.position > 0 and self.position - 1 < self.total_tokens:
+            return self.tokens[self.position - 1]
+        return None
+
     def get_token_line(self):
         token = self.current_token()
-        return token.line if token else 1
+        if token:
+            return token.line
+        prev = self.prev_token()
+        if prev:
+            return prev.line
+        return 1
 
     def get_token_pos(self):
         token = self.current_token()
-        return token.start_pos if token else 1
+        prev = self.prev_token()
+        if prev:
+            return prev.end_pos + 1
+        elif token:
+            return token.start_pos
+        else:
+            return 1
 
     def get_token_value(self):
         token = self.current_token()
@@ -97,59 +109,97 @@ class Parser:
             self.position += 1
         return False
 
-    # === Правила грамматики ===
-
     def parse_start(self):
         return self.parse_if_construction()
 
     def parse_if_construction(self):
-        # if
+        # === 1. Ключевое слово if ===
         if not self.match(self.TOK_IF):
-            self.add_error("Программа должна начинаться с 'if'")
-            self.skip_until({self.TOK_IF})
+            self.add_error("Ожидается 'if'")
+            # Восстановление: ищем '(', '{' или идентификатор
+            self.skip_until({self.TOK_LPAREN, self.TOK_LBRACE, self.TOK_ID})
             if not self.current_token():
                 return False
-            return self.parse_if_construction()
 
-        # (
-        if not self.expect(self.TOK_LPAREN, "Ожидается '(' после 'if'"):
-            self.skip_until({self.TOK_ID, self.TOK_NUM, self.TOK_LPAREN, self.TOK_NOT})
+        # === 2. Открывающая скобка ( ===
+        if not self.match(self.TOK_LPAREN):
+            self.add_error("Ожидается '('")
+            # Восстановление: ищем начало выражения или '{'
+            self.skip_until({self.TOK_ID, self.TOK_NUM, self.TOK_NOT, self.TOK_LBRACE})
+            if not self.current_token():
+                return False
 
-        # <LOGICAL_EXP>
+        # === 3. Логическое выражение ===
         self.parse_logical_exp()
 
-        # )
-        if not self.expect(self.TOK_RPAREN, "Ожидается ')' после условия"):
-            self.skip_until({self.TOK_LBRACE, self.TOK_RPAREN})
-
-        # {
-        if not self.expect(self.TOK_LBRACE, "Ожидается '{'"):
-            self.skip_until({self.TOK_ID, self.TOK_RBRACE})
-
-        # <INSTR> (then)
-        self.parse_instr()
-
-        # }
-        if not self.expect(self.TOK_RBRACE, "Ожидается '}' после then-ветки"):
-            self.skip_until({self.TOK_ELSE, self.TOK_RBRACE})
-
-        # else
-        if not self.expect(self.TOK_ELSE, "Ожидается 'else'"):
+        # === 4. Закрывающая скобка ) ===
+        if not self.match(self.TOK_RPAREN):
+            self.add_error("Ожидается ')'")
+            # Восстановление: ищем '{'
             self.skip_until({self.TOK_LBRACE})
+            if not self.current_token():
+                return False
 
-        # {
-        if not self.expect(self.TOK_LBRACE, "Ожидается '{' после else"):
+        # === 5. Открывающая фигурная скобка { ===
+        if not self.match(self.TOK_LBRACE):
+            self.add_error("Ожидается '{'")
+            # Восстановление: ищем идентификатор или '}'
             self.skip_until({self.TOK_ID, self.TOK_RBRACE})
+            if not self.current_token():
+                return False
 
-        # <INSTR> (else)
+        # === 6. Инструкция в then-ветке ===
         self.parse_instr()
 
-        # }
-        if not self.expect(self.TOK_RBRACE, "Ожидается '}' после else-ветки"):
+        # === 7. Закрывающая фигурная скобка } ===
+        if not self.match(self.TOK_RBRACE):
+            self.add_error("Ожидается '}'")
+            # Восстановление: ищем 'else' или ';'
+            self.skip_until({self.TOK_ELSE, self.TOK_SEMICOLON})
+            # Если нашли 'else' — продолжаем, иначе выходим
+            if not self.current_token():
+                return False
+
+        # === 8. Ключевое слово else ===
+        if not self.match(self.TOK_ELSE):
+            self.add_error("Ожидается 'else'")
+            # Восстановление: ищем '{' или ';'
+            self.skip_until({self.TOK_LBRACE, self.TOK_SEMICOLON})
+            if not self.current_token():
+                return False
+            # Если нашли '{', значит else пропущен, но блок есть — обработаем ниже
+            # Если нашли ';', значит конструкция закончена
+
+        # === 9. Открывающая фигурная скобка { для else ===
+        if self.current_token() and self.current_token().code == self.TOK_LBRACE:
+            self.match(self.TOK_LBRACE)  # потребляем '{', если есть
+        else:
+            # Если нет '{', но мы не в конце — возможно, пропущена
+            if self.current_token() and self.current_token().code != self.TOK_SEMICOLON:
+                self.add_error("Ожидается '{'")
+                self.skip_until({self.TOK_ID, self.TOK_RBRACE, self.TOK_SEMICOLON})
+
+        # === 10. Инструкция в else-ветке (только если мы внутри блока) ===
+        if self.current_token() and self.current_token().code == self.TOK_ID:
+            self.parse_instr()
+        elif self.current_token() and self.current_token().code == self.TOK_RBRACE:
+            # Пустой блок — ошибка
+            self.add_error("Ожидается инструкция")
+            self.match(self.TOK_RBRACE)  # потребляем '}'
+        else:
+            # Нет инструкции — возможно, конец файла
+            pass
+
+        # === 11. Закрывающая фигурная скобка } для else ===
+        if self.current_token() and self.current_token().code == self.TOK_RBRACE:
+            self.match(self.TOK_RBRACE)
+        elif self.current_token() and self.current_token().code != self.TOK_SEMICOLON:
+            self.add_error("Ожидается '}'")
             self.skip_until({self.TOK_SEMICOLON})
 
-        # ;
-        self.expect(self.TOK_SEMICOLON, "Ожидается ';' в конце конструкции")
+        # === 12. Точка с запятой ; ===
+        if not self.match(self.TOK_SEMICOLON):
+            self.add_error("Ожидается ';'")
 
         return True
 
@@ -161,36 +211,27 @@ class Parser:
     def parse_logical_exp_tail(self):
         token = self.current_token()
         if not token or token.code not in self.LOGICAL_OPS:
-            return True  # ε
-
+            return True
         self.position += 1
-
         if not self.parse_compare_exp():
-            self.add_error("Ожидается выражение после логического оператора")
+            self.add_error("Ожидается выражение")
             self.skip_until({self.TOK_RPAREN, self.TOK_LBRACE})
             return False
-
         return self.parse_logical_exp_tail()
 
     def parse_compare_exp(self):
         token = self.current_token()
         if not token:
-            self.add_error("Неожиданный конец файла в выражении")
+            self.add_error("Неожиданный конец файла")
             return False
-
-        # <NOT_OP>
         if token.code in self.NOT_OPS:
             self.position += 1
             return self.parse_compare_exp()
-
-        # ( <LOGICAL_EXP> )
         if token.code == self.TOK_LPAREN:
             self.position += 1
             self.parse_logical_exp()
             self.expect(self.TOK_RPAREN, "Ожидается ')'")
             return True
-
-        # <EXP>
         return self.parse_exp()
 
     def parse_exp(self):
@@ -198,25 +239,27 @@ class Parser:
         if not token:
             return False
 
-        first_token = token
         first_is_id = (token.code == self.TOK_ID)
         first_is_num = (token.code == self.TOK_NUM)
 
         if not (first_is_id or first_is_num):
-            self.add_error(f"Ожидается идентификатор или число, получено '{token.value}'")
-            self.position += 1
+            if token.code in self.COMPARE_OPS:
+                self.add_error("Ожидается идентификатор или число")
+            else:
+                self.add_error("Ожидается идентификатор или число")
+            self.in_error_recovery = True
             return False
 
+        first_token = token
         self.position += 1
 
         token = self.current_token()
         if not token or token.code not in self.COMPARE_OPS:
             self.add_error("Ожидается оператор сравнения")
+            self.in_error_recovery = True
             return False
 
-        compare_op = token
         self.position += 1
-
         token = self.current_token()
         if not token:
             self.add_error("Неожиданный конец файла")
@@ -226,12 +269,12 @@ class Parser:
         second_is_num = (token.code == self.TOK_NUM)
 
         if not (second_is_id or second_is_num):
-            self.add_error(f"Ожидается идентификатор или число, получено '{token.value}'")
-            self.position += 1
+            self.add_error("Ожидается идентификатор или число")
+            self.in_error_recovery = True
             return False
 
         if first_is_num and second_is_num:
-            self.add_error(f"Недопустимое сравнение числа с числом: '{first_token.value}' и '{token.value}'")
+            self.add_error("Сравнение чисел недопустимо")
 
         self.position += 1
         return True
@@ -241,29 +284,58 @@ class Parser:
         if not token:
             return False
 
+        if token.code == -1:
+            self.skip_until({self.TOK_SEMICOLON, self.TOK_RBRACE})
+            if self.current_token() and self.current_token().code == self.TOK_SEMICOLON:
+                self.position += 1
+            return False
+
         if token.code != self.TOK_ID:
-            self.add_error(f"Инструкция должна начинаться с идентификатора, получено '{token.value}'")
+            self.add_error("Ожидается идентификатор")
+            self.skip_until({self.TOK_SEMICOLON, self.TOK_RBRACE})
+            if self.current_token() and self.current_token().code == self.TOK_SEMICOLON:
+                self.position += 1
             return False
 
         self.position += 1
-
-        if not self.expect(self.TOK_ASSIGN, "Ожидается '=' после идентификатора"):
-            return False
-
         token = self.current_token()
-        if not token or token.code not in {self.TOK_ID, self.TOK_NUM}:
-            self.add_error("Ожидается идентификатор или число после '='")
+        if not token or token.code != self.TOK_ASSIGN:
+            if token and token.code == -1:
+                self.position += 1
+            self.add_error("Ожидается '='")
+            self.skip_until({self.TOK_SEMICOLON, self.TOK_RBRACE})
+            if self.current_token() and self.current_token().code == self.TOK_SEMICOLON:
+                self.position += 1
             return False
 
         self.position += 1
+        token = self.current_token()
+        if not token:
+            self.add_error("Ожидается значение")
+            return False
 
-        self.expect(self.TOK_SEMICOLON, "Ожидается ';' в конце инструкции")
+        if token.code == -1:
+            self.position += 1
+            self.skip_until({self.TOK_SEMICOLON, self.TOK_RBRACE})
+            if self.current_token() and self.current_token().code == self.TOK_SEMICOLON:
+                self.position += 1
+            return False
+
+        if token.code in {self.TOK_ID, self.TOK_NUM}:
+            self.position += 1
+        else:
+            self.add_error("Ожидается значение")
+
+        if not self.match(self.TOK_SEMICOLON):
+            self.add_error("Ожидается ';'")
+            self.skip_until({self.TOK_SEMICOLON, self.TOK_RBRACE})
+            if self.current_token() and self.current_token().code == self.TOK_SEMICOLON:
+                self.position += 1
+
         return True
 
     def parse(self):
         self.parse_start()
-
-        # Успех только если нет синтаксических ошибок И не было лексических
         success = (len(self.errors) == 0 and not self.has_lexical_errors)
         return success, self.errors
 
@@ -272,22 +344,3 @@ def parse_tokens(tokens, has_lexical_errors=False):
     parser = Parser(tokens, has_lexical_errors)
     success, errors = parser.parse()
     return success, errors
-
-
-if __name__ == "__main__":
-    from scanner import Scanner
-
-    scanner = Scanner()
-    test = "if (a > b) { max = a; } else { max = b; };"
-    tokens, lex_errors, filtered = scanner.scan(test)
-
-    print(f"Тест парсера: {test}")
-    print(f"Лексических ошибок: {len(lex_errors)}")
-
-    success, errors = parse_tokens(tokens, len(lex_errors) > 0)
-
-    print(f"Успех парсинга: {success}")
-    if errors:
-        print("Синтаксические ошибки:")
-        for e in errors:
-            print(f"  строка {e.line}, '{e.fragment}' - {e.message}")

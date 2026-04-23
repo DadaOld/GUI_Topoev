@@ -21,7 +21,7 @@ class TextEditor(QMainWindow):
         self.init_ui()
 
     def init_ui(self):
-        self.setWindowTitle("Лабораторная работа 2. Лексический анализатор [*]")
+        self.setWindowTitle("Лабораторная работа 3. Синтаксический анализатор [*]")
         self.setGeometry(100, 100, 1400, 700)
 
         central_widget = QWidget()
@@ -237,7 +237,7 @@ class TextEditor(QMainWindow):
         if self.maybe_save():
             self.editor.clear()
             self.current_file = None
-            self.setWindowTitle("Лабораторная работа 2. Лексический анализатор[*]")
+            self.setWindowTitle("Лабораторная работа 3. Синтаксический анализатор[*]")
             self.setWindowModified(False)
             self.clear_results()
             self.statusBar().showMessage("Новый файл создан")
@@ -253,7 +253,7 @@ class TextEditor(QMainWindow):
                         content = f.read()
                     self.editor.setPlainText(content)
                     self.current_file = file_path
-                    self.setWindowTitle(f"{os.path.basename(file_path)} - Лабораторная работа 2[*]")
+                    self.setWindowTitle(f"{os.path.basename(file_path)} - Лабораторная работа 3[*]")
                     self.setWindowModified(False)
                     self.clear_results()
                     self.statusBar().showMessage(f"Файл загружен: {file_path}")
@@ -282,7 +282,7 @@ class TextEditor(QMainWindow):
                 f.write(self.editor.toPlainText())
             self.current_file = file_path
             self.editor.document().setModified(False)
-            self.setWindowTitle(f"{os.path.basename(file_path)} - Лабораторная работа 2[*]")
+            self.setWindowTitle(f"{os.path.basename(file_path)} - Лабораторная работа 3[*]")
             self.setWindowModified(False)
             self.statusBar().showMessage(f"Файл сохранен: {file_path}")
             self.output_area.append(f"# Файл сохранен: {file_path}")
@@ -325,10 +325,8 @@ class TextEditor(QMainWindow):
         self.clear_results()
         self.output_area.clear()
 
-        # Лексический анализ
         tokens, lex_errors, filtered_text = self.scanner.scan(text)
 
-        # Синтаксический анализ
         syntax_errors = []
         parse_success = True
 
@@ -339,7 +337,6 @@ class TextEditor(QMainWindow):
                 self.output_area.append(f"Ошибка парсера: {e}")
                 syntax_errors = []
 
-        # Проверка ошибок
         total_errors = len(lex_errors) + len(syntax_errors)
 
         if total_errors == 0:
@@ -370,15 +367,30 @@ class TextEditor(QMainWindow):
             self.output_area.append(
                 f"\nВсего ошибок: {total_errors} (лексических: {len(lex_errors)}, синтаксических: {len(syntax_errors)})")
 
-        # Заполнение таблицы
-        table_data = self.scanner.get_table_data(tokens, lex_errors)
+        self.results_table.setRowCount(len(syntax_errors))
+        self.results_table.setColumnCount(3)
+        self.results_table.setHorizontalHeaderLabels(["Строка", "Позиция", "Сообщение"])
 
-        for err in syntax_errors:
-            table_data.append({
-                'code': -1,
-                'type_desc': 'синтаксическая ошибка',
-                'value': err.fragment,
-                'location': f"строка {err.line}, {err.pos}-{err.pos}",
+        for row, err in enumerate(syntax_errors):
+            line_item = QTableWidgetItem(str(err.line))
+            line_item.setFlags(line_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
+            line_item.setBackground(Qt.GlobalColor.red)
+            line_item.setForeground(Qt.GlobalColor.white)
+            self.results_table.setItem(row, 0, line_item)
+
+            pos_item = QTableWidgetItem(str(err.pos))
+            pos_item.setFlags(pos_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
+            pos_item.setBackground(Qt.GlobalColor.red)
+            pos_item.setForeground(Qt.GlobalColor.white)
+            self.results_table.setItem(row, 1, pos_item)
+
+            msg_item = QTableWidgetItem(err.message)
+            msg_item.setFlags(msg_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
+            msg_item.setBackground(Qt.GlobalColor.red)
+            msg_item.setForeground(Qt.GlobalColor.white)
+            self.results_table.setItem(row, 2, msg_item)
+
+            self.results_table.item(row, 0).setData(Qt.ItemDataRole.UserRole, {
                 'line': err.line,
                 'start': err.pos,
                 'end': err.pos,
@@ -386,51 +398,11 @@ class TextEditor(QMainWindow):
                 'message': err.message
             })
 
-        self.results_table.setRowCount(len(table_data))
-
-        for row, item in enumerate(table_data):
-            # Код
-            code_item = QTableWidgetItem(str(item['code']))
-            code_item.setFlags(code_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
-            if item.get('is_error', False):
-                code_item.setBackground(Qt.GlobalColor.red)
-                code_item.setForeground(Qt.GlobalColor.white)
-            self.results_table.setItem(row, 0, code_item)
-
-            # Тип лексемы
-            type_item = QTableWidgetItem(item['type_desc'])
-            type_item.setFlags(type_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
-            if item.get('is_error', False):
-                type_item.setBackground(Qt.GlobalColor.red)
-                type_item.setForeground(Qt.GlobalColor.white)
-            self.results_table.setItem(row, 1, type_item)
-
-            # Лексема
-            if item.get('is_error', False):
-                value_item = QTableWidgetItem(item['value'])
-            else:
-                value_item = QTableWidgetItem(repr(item['value']))
-            value_item.setFlags(value_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
-            if item.get('is_error', False):
-                value_item.setBackground(Qt.GlobalColor.red)
-                value_item.setForeground(Qt.GlobalColor.white)
-            self.results_table.setItem(row, 2, value_item)
-
-            # Местоположение
-            loc_item = QTableWidgetItem(item['location'])
-            loc_item.setFlags(loc_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
-            if item.get('is_error', False):
-                loc_item.setBackground(Qt.GlobalColor.red)
-                loc_item.setForeground(Qt.GlobalColor.white)
-            self.results_table.setItem(row, 3, loc_item)
-
-            self.results_table.item(row, 0).setData(Qt.ItemDataRole.UserRole, item)
-
         self.results_table.resizeColumnsToContents()
         self.results_table.horizontalHeader().setStretchLastSection(True)
 
         self.statusBar().showMessage(
-            f"Анализ завершен. Токенов: {len(tokens)}, ошибок: {total_errors}",
+            f"Анализ завершен. Ошибок: {total_errors}",
             5000
         )
 
@@ -462,14 +434,226 @@ class TextEditor(QMainWindow):
     def show_text_info(self, title):
         dialog = QDialog(self)
         dialog.setWindowTitle(title)
-        dialog.setMinimumWidth(400)
+        dialog.setMinimumWidth(600)
+        dialog.setMinimumHeight(400)
         layout = QVBoxLayout(dialog)
 
-        label = QLabel(f"<b>{title}</b>\n\nЭтот раздел будет реализован в следующих лабораторных работах.\n\n"
-                       f"Здесь будет размещена информация о грамматике, методе анализа и т.д.")
-        label.setWordWrap(True)
-        label.setTextFormat(Qt.TextFormat.RichText)
-        layout.addWidget(label)
+        text_edit = QTextEdit()
+        text_edit.setReadOnly(True)
+
+        if title == "Постановка задачи":
+            text_edit.setPlainText("""
+    Постановка задачи
+
+    Разработать лексический и синтаксический анализатор для конструкции if-else с блоком действий.
+
+    Язык должен поддерживать:
+    1. Ключевые слова: if, else
+    2. Логические операторы: and, or, not, &&, ||, !
+    3. Операторы сравнения: >, <, >=, <=, ==, !=
+    4. Арифметические операторы: +, -, *, /
+    5. Присваивание: =
+    6. Разделители: (, ), {, }, ;
+    7. Идентификаторы и числа
+
+    Пример корректной программы:
+    if (a > b) {
+        max = a;
+    } else {
+        max = b;
+    };
+
+    Задача: выделить все лексемы из входного текста и проверить синтаксическую правильность конструкции.
+    """)
+
+        elif title == "Грамматика":
+            text_edit.setPlainText("""
+    Грамматика G[START] для конструкции if-else
+
+    1) <START> → <IF_construction> <END>
+
+    2) <IF_construction> → if ( <LOGICAL_EXP> ) { <INSTR> } else { <INSTR> } ;
+
+    3) <LOGICAL_EXP> → <COMPARE_EXP> <LOGICAL_EXP_TAIL>
+
+    4) <LOGICAL_EXP_TAIL> → <LOGICAL_OP> <COMPARE_EXP> <LOGICAL_EXP_TAIL> | ε
+
+    5) <LOGICAL_OP> → && | and | || | or
+
+    6) <NOT_OP> → ! | not
+
+    7) <COMPARE_EXP> → <NOT_OP> <COMPARE_EXP> | ( <LOGICAL_EXP> ) | <EXP>
+
+    8) <EXP> → <id> <COMPARE> <id> | <id> <COMPARE> <num> | <num> <COMPARE> <id>
+
+    9) <COMPARE> → > | < | >= | <= | == | !=
+
+    10) <INSTR> → <id> = <id> ; | <id> = <num> ;
+
+    11) <id> → <letter> <ID_TAIL>
+
+    12) <ID_TAIL> → <letter> <ID_TAIL> | <digit> <ID_TAIL> | ε
+
+    13) <num> → <digit> <NUM_TAIL>
+
+    14) <NUM_TAIL> → <digit> <NUM_TAIL> | ε
+
+    15) <letter> → a | b | c | ... | z | A | B | C | ... | Z
+
+    16) <digit> → 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9
+
+    17) <END> → ε
+    """)
+
+        elif title == "Классификация грамматики":
+            text_edit.setPlainText("""
+    Классификация грамматики по Хомскому
+
+    Данная грамматика относится к типу 2 (контекстно-свободная).
+
+    Обоснование:
+    1. Все правила имеют вид A → α, где A - нетерминал, α - строка из терминалов и нетерминалов
+    2. Отсутствуют контекстно-зависимые правила (нет ограничений на окружение)
+    3. Грамматика содержит рекурсивные правила (<LOGICAL_EXP_TAIL> может содержать себя)
+
+    КС-грамматики достаточны для описания большинства конструкций языков программирования, включая вложенные структуры и сбалансированные скобки.
+
+    Грамматика преобразована к LL(1)-виду (устранена левая рекурсия):
+    - <LOGICAL_EXP> → <COMPARE_EXP> <LOGICAL_EXP_TAIL> (вместо леворекурсивного правила)
+    - <id> → <letter> <ID_TAIL>
+    - <num> → <digit> <NUM_TAIL>
+    """)
+
+        elif title == "Метод анализа":
+            text_edit.setPlainText("""
+    Метод анализа
+
+    Для синтаксического анализа используется метод рекурсивного спуска.
+
+    Особенности:
+    1. Каждому нетерминалу грамматики соответствует своя функция
+    2. Анализ выполняется слева направо (LL-анализ)
+    3. Для восстановления после ошибок используется метод Айронса
+
+    Метод Айронса:
+    - При обнаружении ошибки парсер не останавливается
+    - Ошибочный фрагмент пропускается до ближайшего синхронизирующего токена (if, else, {, }, ;)
+    - Анализ продолжается с этого места
+
+    Преимущества рекурсивного спуска:
+    - Простота реализации
+    - Наглядность (код соответствует грамматике)
+    - Удобная обработка ошибок
+    - Естественная поддержка рекурсивных конструкций
+    """)
+
+        elif title == "Тестовый пример":
+            text_edit.setPlainText("""
+    Тестовый пример
+
+    Корректная программа:
+
+    if (a > b) {
+        max = a;
+    } else {
+        max = b;
+    };
+
+    Результат лексического анализа:
+
+    Код | Тип лексемы              | Лексема
+    ----|--------------------------|--------
+    1   | ключевое слово if        | if
+    15  | открывающая скобка       | (
+    3   | идентификатор            | a
+    5   | оператор сравнения >     | >
+    3   | идентификатор            | b
+    23  | логическое и             | and
+    15  | открывающая скобка       | (
+    3   | идентификатор            | a
+    5   | оператор сравнения >     | >
+    3   | идентификатор            | c
+    24  | логическое или           | or
+    25  | логическое не            | not
+    15  | открывающая скобка       | (
+    3   | идентификатор            | b
+    6   | оператор сравнения <     | <
+    3   | идентификатор            | c
+    16  | закрывающая скобка       | )
+    16  | закрывающая скобка       | )
+    17  | открывающая фигурная     | {
+    3   | идентификатор            | a
+    4   | оператор присваивания    | =
+    22  | число                    | 1
+    19  | конец оператора          | ;
+    18  | закрывающая фигурная     | }
+    2   | ключевое слово else      | else
+    17  | открывающая фигурная     | {
+    3   | идентификатор            | b
+    4   | оператор присваивания    | =
+    3   | идентификатор            | c
+    19  | конец оператора          | ;
+    18  | закрывающая фигурная     | }
+    19  | конец оператора          | ;
+
+    Результат синтаксического анализа: ошибок не обнаружено.
+    """)
+
+        elif title == "Список литературы":
+            text_edit.setPlainText("""
+    Список литературы
+
+    1. Ахо А., Лам М., Сети Р., Ульман Д. Компиляторы: принципы, технологии и инструментарий. — 2-е изд. — М.: Вильямс, 2008. — 1175 с.
+
+    2. Вирт Н. Построение компиляторов. — М.: ДМК Пресс, 2010. — 192 с.
+
+    3. Грис Д. Конструирование компиляторов для цифровых вычислительных машин. — М.: Мир, 1975. — 544 с.
+
+    4. Карпов Ю. Г. Теория автоматов. — СПб.: Питер, 2002. — 206 с.
+
+    5. Шорников Ю. В. Теория языков программирования: проектирование и реализация. — Новосибирск: Изд-во НГТУ, 2022. — 290 с.
+
+    6. Шорников Ю. В. Теория и практика языковых процессоров. — Новосибирск: Изд-во НГТУ, 2004. — 204 с.
+
+    7. Свердлов С. З. Языки программирования и методы трансляции. — СПб.: Лань, 2019. — 564 с.
+
+    8. Гордеев А. В., Молчанов А. Ю. Системное программное обеспечение. — СПб.: Питер, 2001. — 734 с.
+    """)
+
+        elif title == "Исходный код программы":
+            text_edit.setPlainText("""
+    Исходный код программы
+
+    Программа состоит из следующих модулей:
+
+    1. main.py - графический интерфейс пользователя (GUI)
+       - Редактор текста
+       - Таблица результатов
+       - Меню и панель инструментов
+
+    2. scanner.py - лексический анализатор
+       - Распознавание ключевых слов if, else
+       - Распознавание логических операторов and, or, not, &&, ||, !
+       - Распознавание операторов сравнения
+       - Распознавание идентификаторов и чисел
+       - Фильтрация незначащих символов
+       - Группировка подряд идущих ошибок
+
+    3. parser.py - синтаксический анализатор
+       - Рекурсивный спуск по грамматике
+       - Обработка синтаксических ошибок (метод Айронса)
+       - Восстановление после ошибок
+
+    Основные классы:
+    - Token - хранение информации о лексеме
+    - Scanner - лексический анализ
+    - Parser - синтаксический анализ
+    - SyntaxError - хранение информации об ошибке
+
+    Полный исходный код доступен в файлах проекта.
+    """)
+
+        layout.addWidget(text_edit)
 
         button_box = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok)
         button_box.accepted.connect(dialog.accept)
@@ -539,7 +723,7 @@ class TextEditor(QMainWindow):
         QMessageBox.about(
             self,
             "О программе",
-            "<b>Лабораторная работа 2</b><br>"
+            "<b>Лабораторная работа 3</b><br>"
             "<b>Автор:</b> Топоев Максим<br>"
             "<b>Группа:</b> АП-327<br>"
             "<b>Преподаватель:</b> Антонянц Егор Николаевич<br>"
