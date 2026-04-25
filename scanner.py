@@ -5,7 +5,6 @@ class TokenType:
     TAB = 20
     NEWLINE = 21
 
-
 class Token:
     def __init__(self, code, type_desc, value, line, start_pos, end_pos):
         self.code = code
@@ -25,7 +24,6 @@ class Token:
             'start': self.start_pos,
             'end': self.end_pos
         }
-
 
 class Scanner:
     def __init__(self):

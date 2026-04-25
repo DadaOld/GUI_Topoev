@@ -113,93 +113,167 @@ class Parser:
         return self.parse_if_construction()
 
     def parse_if_construction(self):
-        # === 1. Ключевое слово if ===
-        if not self.match(self.TOK_IF):
-            self.add_error("Ожидается 'if'")
-            # Восстановление: ищем '(', '{' или идентификатор
-            self.skip_until({self.TOK_LPAREN, self.TOK_LBRACE, self.TOK_ID})
-            if not self.current_token():
-                return False
+        token = self.current_token()
+        if_token_present = True
 
-        # === 2. Открывающая скобка ( ===
-        if not self.match(self.TOK_LPAREN):
-            self.add_error("Ожидается '('")
-            # Восстановление: ищем начало выражения или '{'
-            self.skip_until({self.TOK_ID, self.TOK_NUM, self.TOK_NOT, self.TOK_LBRACE})
-            if not self.current_token():
-                return False
+        # Проверяем, является ли первый токен лексической ошибкой, за которой идёт '('
+        if token and token.code == -1:
+            next_token = self.tokens[self.position + 1] if self.position + 1 < self.total_tokens else None
+            if next_token and next_token.code == self.TOK_LPAREN:
+                self.add_error("Ожидается 'if'")
+                if_token_present = False
+                self.position += 1
+                token = self.current_token()
+                if token and token.code == self.TOK_ID:
+                    self.position += 1
+            else:
+                self.add_error("Ожидается 'if'")
+                if_token_present = False
+                self.position += 1
+                while self.current_token():
+                    t = self.current_token()
+                    if t.code == self.TOK_LPAREN:
+                        break
+                    if t.code in {self.TOK_IF, self.TOK_ELSE, self.TOK_LBRACE, self.TOK_SEMICOLON}:
+                        break
+                    self.position += 1
 
-        # === 3. Логическое выражение ===
+        # Проверяем, является ли первый токен числом, за которым идёт '('
+        elif token and token.code == self.TOK_NUM:
+            next_token = self.tokens[self.position + 1] if self.position + 1 < self.total_tokens else None
+            if next_token and next_token.code == self.TOK_LPAREN:
+                # Число перед '(' — попытка написать 'if'
+                self.add_error("Ожидается 'if'")
+                if_token_present = False
+                self.position += 1  # пропускаем число
+            else:
+                self.add_error("Ожидается 'if'")
+                if_token_present = False
+                self.position += 1
+                while self.current_token():
+                    t = self.current_token()
+                    if t.code == self.TOK_LPAREN:
+                        break
+                    if t.code in {self.TOK_IF, self.TOK_ELSE, self.TOK_LBRACE, self.TOK_SEMICOLON}:
+                        break
+                    self.position += 1
+
+        # Проверяем, является ли первый токен идентификатором, за которым идёт '('
+        elif token and token.code == self.TOK_ID:
+            next_token = self.tokens[self.position + 1] if self.position + 1 < self.total_tokens else None
+            if next_token and next_token.code == self.TOK_LPAREN:
+                if token.value != 'if':
+                    self.add_error("Ожидается 'if'")
+                if_token_present = False
+                self.position += 1
+            elif token.value.startswith('i'):
+                self.add_error("Ожидается 'if'")
+                if_token_present = False
+                while self.current_token():
+                    t = self.current_token()
+                    if t.code == self.TOK_LPAREN:
+                        break
+                    if t.code in {self.TOK_IF, self.TOK_ELSE, self.TOK_LBRACE, self.TOK_SEMICOLON}:
+                        break
+                    self.position += 1
+            else:
+                self.add_error("Ожидается 'if'")
+                if_token_present = False
+
+        elif not self.match(self.TOK_IF):
+            if token and token.code in {self.TOK_LPAREN}:
+                self.add_error("Ожидается 'if'")
+                if_token_present = False
+            else:
+                self.add_error("Ожидается 'if'")
+                tok = self.current_token()
+                if not tok:
+                    return False
+                if tok.code == self.TOK_SEMICOLON:
+                    self.position += 1
+                    return False
+                self.position += 1
+
+        # Проверяем '('
+        token = self.current_token()
+        if token and token.code == self.TOK_LPAREN:
+            self.position += 1
+        else:
+            if if_token_present or token:
+                self.add_error("Ожидается '('")
+            self.skip_until({self.TOK_ID, self.TOK_NUM, self.TOK_LPAREN, self.TOK_NOT})
+
+        # <LOGICAL_EXP>
+        self.in_error_recovery = False
         self.parse_logical_exp()
 
-        # === 4. Закрывающая скобка ) ===
-        if not self.match(self.TOK_RPAREN):
-            self.add_error("Ожидается ')'")
-            # Восстановление: ищем '{'
-            self.skip_until({self.TOK_LBRACE})
-            if not self.current_token():
-                return False
+        # )
+        if not self.in_error_recovery:
+            if not self.expect(self.TOK_RPAREN, "Ожидается ')'"):
+                self.skip_until({self.TOK_LBRACE, self.TOK_SEMICOLON})
+        else:
+            self.skip_until({self.TOK_LBRACE, self.TOK_SEMICOLON})
+            self.in_error_recovery = False
 
-        # === 5. Открывающая фигурная скобка { ===
-        if not self.match(self.TOK_LBRACE):
-            self.add_error("Ожидается '{'")
-            # Восстановление: ищем идентификатор или '}'
+        # {
+        if not self.expect(self.TOK_LBRACE, "Ожидается '{'"):
             self.skip_until({self.TOK_ID, self.TOK_RBRACE})
-            if not self.current_token():
-                return False
 
-        # === 6. Инструкция в then-ветке ===
+        # <INSTR> (then)
         self.parse_instr()
 
-        # === 7. Закрывающая фигурная скобка } ===
-        if not self.match(self.TOK_RBRACE):
-            self.add_error("Ожидается '}'")
-            # Восстановление: ищем 'else' или ';'
+        # }
+        if not self.expect(self.TOK_RBRACE, "Ожидается '}'"):
             self.skip_until({self.TOK_ELSE, self.TOK_SEMICOLON})
-            # Если нашли 'else' — продолжаем, иначе выходим
-            if not self.current_token():
-                return False
 
-        # === 8. Ключевое слово else ===
-        if not self.match(self.TOK_ELSE):
+        # Проверяем, что идёт после }
+        token = self.current_token()
+
+        # Если сразу '{' без else — ошибка
+        if token and token.code == self.TOK_LBRACE:
             self.add_error("Ожидается 'else'")
-            # Восстановление: ищем '{' или ';'
-            self.skip_until({self.TOK_LBRACE, self.TOK_SEMICOLON})
-            if not self.current_token():
-                return False
-            # Если нашли '{', значит else пропущен, но блок есть — обработаем ниже
-            # Если нашли ';', значит конструкция закончена
-
-        # === 9. Открывающая фигурная скобка { для else ===
-        if self.current_token() and self.current_token().code == self.TOK_LBRACE:
-            self.match(self.TOK_LBRACE)  # потребляем '{', если есть
-        else:
-            # Если нет '{', но мы не в конце — возможно, пропущена
-            if self.current_token() and self.current_token().code != self.TOK_SEMICOLON:
-                self.add_error("Ожидается '{'")
-                self.skip_until({self.TOK_ID, self.TOK_RBRACE, self.TOK_SEMICOLON})
-
-        # === 10. Инструкция в else-ветке (только если мы внутри блока) ===
-        if self.current_token() and self.current_token().code == self.TOK_ID:
+            self.position += 1
             self.parse_instr()
-        elif self.current_token() and self.current_token().code == self.TOK_RBRACE:
-            # Пустой блок — ошибка
-            self.add_error("Ожидается инструкция")
-            self.match(self.TOK_RBRACE)  # потребляем '}'
-        else:
-            # Нет инструкции — возможно, конец файла
-            pass
+            self.expect(self.TOK_RBRACE, "Ожидается '}'")
+            self.expect(self.TOK_SEMICOLON, "Ожидается ';'")
+            return True
 
-        # === 11. Закрывающая фигурная скобка } для else ===
-        if self.current_token() and self.current_token().code == self.TOK_RBRACE:
-            self.match(self.TOK_RBRACE)
-        elif self.current_token() and self.current_token().code != self.TOK_SEMICOLON:
-            self.add_error("Ожидается '}'")
-            self.skip_until({self.TOK_SEMICOLON})
+        # else
+        if token:
+            if token.code == self.TOK_ELSE:
+                self.position += 1
 
-        # === 12. Точка с запятой ; ===
-        if not self.match(self.TOK_SEMICOLON):
-            self.add_error("Ожидается ';'")
+                has_lbrace = self.match(self.TOK_LBRACE)
+                if not has_lbrace:
+                    self.add_error("Ожидается '{'")
+                    self.skip_until({self.TOK_ID, self.TOK_RBRACE})
+
+                self.parse_instr()
+
+                if has_lbrace:
+                    if not self.expect(self.TOK_RBRACE, "Ожидается '}'"):
+                        self.skip_until({self.TOK_SEMICOLON})
+                else:
+                    self.match(self.TOK_RBRACE)
+
+            elif token.code == self.TOK_ID and (token.value.startswith('e') or token.value.startswith('el')):
+                self.add_error("Ожидается 'else' или ';'")
+                self.position += 1
+                self.skip_until({self.TOK_LBRACE, self.TOK_SEMICOLON})
+                if self.current_token() and self.current_token().code == self.TOK_LBRACE:
+                    self.position += 1
+                    self.parse_instr()
+                    self.expect(self.TOK_RBRACE, "Ожидается '}'")
+            elif token.code == -1:
+                self.position += 1
+                self.skip_until({self.TOK_LBRACE, self.TOK_SEMICOLON})
+                if self.current_token() and self.current_token().code == self.TOK_LBRACE:
+                    self.position += 1
+                    self.parse_instr()
+                    self.expect(self.TOK_RBRACE, "Ожидается '}'")
+
+        # ;
+        self.expect(self.TOK_SEMICOLON, "Ожидается ';'")
 
         return True
 
