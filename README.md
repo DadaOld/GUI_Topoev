@@ -98,7 +98,7 @@ max = b;
 ## Метод анализа
 ### Граф рекурсивного спуска
 
-![](Screenshots/Recurs_Spusk.png)
+![](Screenshots/Recurs_spusk.png)
 
 Рисунок 2. Рекурсивный спуск
 
