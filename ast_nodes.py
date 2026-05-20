@@ -1,286 +1,197 @@
-# ast_nodes.py - классы для абстрактного синтаксического дерева
+# ast_nodes.py - полная версия с Str
 
 from typing import List, Optional
 
 
 class ASTNode:
-    """Базовый класс для всех узлов AST"""
-
     def __init__(self, line: int, pos: int):
         self.line = line
         self.pos = pos
 
-    def __repr__(self):
-        return f"{self.__class__.__name__}(line={self.line}, pos={self.pos})"
 
-
-class ProgramNode(ASTNode):
-    """Корневой узел программы"""
-
+class Program(ASTNode):
     def __init__(self, line: int = 1, pos: int = 1):
         super().__init__(line, pos)
-        self.children = []
+        self.nodes = []
 
-    def add_child(self, node: ASTNode):
-        self.children.append(node)
-
-    def __repr__(self):
-        return f"ProgramNode(children={len(self.children)})"
+    def add(self, node):
+        self.nodes.append(node)
 
 
-class IfNode(ASTNode):
-    """Узел условного оператора if-else"""
-
-    def __init__(self, line: int, pos: int, condition: ASTNode, then_block: 'BlockNode',
-                 else_block: Optional['BlockNode'] = None):
+class Decl(ASTNode):
+    def __init__(self, line: int, pos: int, var_type: str, name: str, value: Optional[ASTNode] = None):
         super().__init__(line, pos)
-        self.condition = condition
-        self.then_block = then_block
-        self.else_block = else_block
-
-    def __repr__(self):
-        return f"IfNode(has_else={self.else_block is not None})"
+        self.var_type = var_type
+        self.name = name
+        self.value = value
 
 
-class BlockNode(ASTNode):
-    """Узел блока { ... }"""
+class If(ASTNode):
+    def __init__(self, line: int, pos: int, condition: ASTNode, then_block: 'Block',
+                 else_block: Optional['Block'] = None):
+        super().__init__(line, pos)
+        self.cond = condition
+        self.then = then_block
+        self.else_ = else_block
 
+
+class Block(ASTNode):
     def __init__(self, line: int, pos: int):
         super().__init__(line, pos)
-        self.instructions = []
+        self.stmts = []
 
-    def add_instruction(self, instr: ASTNode):
-        self.instructions.append(instr)
-
-    def __repr__(self):
-        return f"BlockNode(instructions={len(self.instructions)})"
+    def add(self, stmt):
+        self.stmts.append(stmt)
 
 
-class AssignmentNode(ASTNode):
-    """Узел присваивания id = id; или id = num;"""
-
-    def __init__(self, line: int, pos: int, left: 'IdentifierNode', right: ASTNode):
+class Assign(ASTNode):
+    def __init__(self, line: int, pos: int, left: 'Var', right: ASTNode):
         super().__init__(line, pos)
         self.left = left
         self.right = right
 
-    def __repr__(self):
-        return f"AssignmentNode(left={self.left.name})"
 
-
-class IdentifierNode(ASTNode):
-    """Узел идентификатора"""
-
+class Var(ASTNode):
     def __init__(self, line: int, pos: int, name: str):
         super().__init__(line, pos)
         self.name = name
 
-    def __repr__(self):
-        return f"IdentifierNode({self.name})"
 
-
-class NumberNode(ASTNode):
-    """Узел числового литерала"""
-
+class Num(ASTNode):
     def __init__(self, line: int, pos: int, value: str):
         super().__init__(line, pos)
         self.value = value
 
-    def __repr__(self):
-        return f"NumberNode({self.value})"
+
+class Bool(ASTNode):
+    def __init__(self, line: int, pos: int, value: bool):
+        super().__init__(line, pos)
+        self.value = value
 
 
-class LogicalExpNode(ASTNode):
-    """Узел логического выражения"""
+class Str(ASTNode):
+    def __init__(self, line: int, pos: int, value: str):
+        super().__init__(line, pos)
+        self.value = value
 
-    def __init__(self, line: int, pos: int, left: ASTNode, operator: Optional['LogicalOpNode'] = None,
-                 right: Optional[ASTNode] = None):
+
+class Compare(ASTNode):
+    def __init__(self, line: int, pos: int, left: ASTNode, op: 'Op', right: ASTNode):
         super().__init__(line, pos)
         self.left = left
-        self.operator = operator
+        self.op = op
         self.right = right
 
-    def __repr__(self):
-        if self.operator:
-            return f"LogicalExpNode(op={self.operator.operator})"
-        return "LogicalExpNode"
 
-
-class CompareExpNode(ASTNode):
-    """Узел выражения сравнения"""
-
-    def __init__(self, line: int, pos: int, left: ASTNode, operator: 'CompareOpNode', right: ASTNode):
+class Logic(ASTNode):
+    def __init__(self, line: int, pos: int, left: ASTNode, op: 'Op', right: ASTNode):
         super().__init__(line, pos)
         self.left = left
-        self.operator = operator
+        self.op = op
         self.right = right
 
-    def __repr__(self):
-        return f"CompareExpNode(op={self.operator.operator})"
 
-
-class NotOpNode(ASTNode):
-    """Узел отрицания (! или not)"""
-
+class Not(ASTNode):
     def __init__(self, line: int, pos: int, expr: ASTNode):
         super().__init__(line, pos)
         self.expr = expr
 
-    def __repr__(self):
-        return "NotOpNode"
 
-
-class CompareOpNode(ASTNode):
-    """Узел оператора сравнения"""
-
-    def __init__(self, line: int, pos: int, operator: str):
+class Op(ASTNode):
+    def __init__(self, line: int, pos: int, value: str):
         super().__init__(line, pos)
-        self.operator = operator
-
-    def __repr__(self):
-        return f"CompareOpNode({self.operator})"
+        self.value = value
 
 
-class LogicalOpNode(ASTNode):
-    """Узел логического оператора"""
-
-    def __init__(self, line: int, pos: int, operator: str):
-        super().__init__(line, pos)
-        self.operator = operator
-
-    def __repr__(self):
-        return f"LogicalOpNode({self.operator})"
-
-
-class ParenExpNode(ASTNode):
-    """Узел выражения в скобках ( ( ... ) )"""
-
+class Paren(ASTNode):
     def __init__(self, line: int, pos: int, expr: ASTNode):
         super().__init__(line, pos)
         self.expr = expr
-
-    def __repr__(self):
-        return "ParenExpNode"
 
 
 class ASTPrinter:
-    """Класс для визуализации AST в текстовом виде"""
-
     @staticmethod
-    def print_ast(node: ASTNode, prefix: str = "", is_last: bool = True) -> str:
-        """Рекурсивный вывод AST с красивыми отступами"""
+    def print(node: ASTNode, prefix: str = "", is_last: bool = True) -> str:
         lines = []
-
-        # Определяем имя узла с дополнительной информацией
-        node_name = ASTPrinter._get_node_name(node)
-
-        # Добавляем текущий узел
+        node_name = ASTPrinter._name(node)
         connector = "└── " if is_last else "├── "
         lines.append(f"{prefix}{connector}{node_name}")
-
-        # Обновляем префикс для детей
         new_prefix = prefix + ("    " if is_last else "│   ")
-
-        # Получаем детей узла
-        children = ASTPrinter._get_children(node)
-
-        # Рекурсивно выводим детей
+        children = ASTPrinter._children(node)
         for i, child in enumerate(children):
             is_last_child = (i == len(children) - 1)
-            lines.append(ASTPrinter.print_ast(child, new_prefix, is_last_child))
-
+            lines.append(ASTPrinter.print(child, new_prefix, is_last_child))
         return "\n".join(lines)
 
     @staticmethod
-    def _get_node_name(node: ASTNode) -> str:
-        """Возвращает имя узла с атрибутами"""
-        if isinstance(node, ProgramNode):
+    def _name(node: ASTNode) -> str:
+        if isinstance(node, Program):
             return "Program"
-
-        elif isinstance(node, IfNode):
-            return "IfStatement"
-
-        elif isinstance(node, BlockNode):
+        elif isinstance(node, Decl):
+            return f"Decl: {node.var_type} {node.name}"
+        elif isinstance(node, If):
+            return "If"
+        elif isinstance(node, Block):
             return "Block"
-
-        elif isinstance(node, AssignmentNode):
-            return "Assignment"
-
-        elif isinstance(node, IdentifierNode):
-            return f"Identifier: {node.name}"
-
-        elif isinstance(node, NumberNode):
-            return f"Number: {node.value}"
-
-        elif isinstance(node, LogicalExpNode):
-            if node.operator:
-                return f"LogicalExp ({node.operator.operator})"
-            return "LogicalExp"
-
-        elif isinstance(node, CompareExpNode):
-            return f"Compare: {node.operator.operator}"
-
-        elif isinstance(node, NotOpNode):
+        elif isinstance(node, Assign):
+            return "Assign"
+        elif isinstance(node, Var):
+            return f"Var: {node.name}"
+        elif isinstance(node, Num):
+            return f"Num: {node.value}"
+        elif isinstance(node, Bool):
+            return f"Bool: {node.value}"
+        elif isinstance(node, Str):
+            return f"String: {node.value}"
+        elif isinstance(node, Compare):
+            return f"Compare ({node.op.value})"
+        elif isinstance(node, Logic):
+            return f"Logic ({node.op.value})"
+        elif isinstance(node, Not):
             return "Not"
-
-        elif isinstance(node, CompareOpNode):
-            return f"Op: {node.operator}"
-
-        elif isinstance(node, LogicalOpNode):
-            return f"Op: {node.operator}"
-
-        elif isinstance(node, ParenExpNode):
+        elif isinstance(node, Op):
+            return f"Op: {node.value}"
+        elif isinstance(node, Paren):
             return "Paren"
-
         return node.__class__.__name__
 
     @staticmethod
-    def _get_children(node: ASTNode) -> List[ASTNode]:
-        """Возвращает список дочерних узлов"""
+    def _children(node: ASTNode) -> List[ASTNode]:
         children = []
-
-        if isinstance(node, ProgramNode):
-            children.extend(node.children)
-
-        elif isinstance(node, IfNode):
-            if node.condition:
-                children.append(node.condition)
-            if node.then_block:
-                children.append(node.then_block)
-            if node.else_block:
-                children.append(node.else_block)
-
-        elif isinstance(node, BlockNode):
-            children.extend(node.instructions)
-
-        elif isinstance(node, AssignmentNode):
+        if isinstance(node, Program):
+            children.extend(node.nodes)
+        elif isinstance(node, Decl) and node.value:
+            children.append(node.value)
+        elif isinstance(node, If):
+            if node.cond:
+                children.append(node.cond)
+            if node.then:
+                children.append(node.then)
+            if node.else_:
+                children.append(node.else_)
+        elif isinstance(node, Block):
+            children.extend(node.stmts)
+        elif isinstance(node, Assign):
             if node.left:
                 children.append(node.left)
             if node.right:
                 children.append(node.right)
-
-        elif isinstance(node, LogicalExpNode):
+        elif isinstance(node, Compare):
             if node.left:
                 children.append(node.left)
-            if node.operator:
-                children.append(node.operator)
+            if node.op:
+                children.append(node.op)
             if node.right:
                 children.append(node.right)
-
-        elif isinstance(node, CompareExpNode):
+        elif isinstance(node, Logic):
             if node.left:
                 children.append(node.left)
-            if node.operator:
-                children.append(node.operator)
+            if node.op:
+                children.append(node.op)
             if node.right:
                 children.append(node.right)
-
-        elif isinstance(node, NotOpNode):
-            if node.expr:
-                children.append(node.expr)
-
-        elif isinstance(node, ParenExpNode):
-            if node.expr:
-                children.append(node.expr)
-
+        elif isinstance(node, Not) and node.expr:
+            children.append(node.expr)
+        elif isinstance(node, Paren) and node.expr:
+            children.append(node.expr)
         return children

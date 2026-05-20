@@ -1,10 +1,12 @@
+# main.py - ПОЛНЫЙ ФАЙЛ
+
 import sys
 import os
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QTextEdit, QVBoxLayout, QWidget,
     QMenu, QToolBar, QFileDialog, QMessageBox, QSplitter, QDialog,
     QLabel, QDialogButtonBox, QTableWidget, QTableWidgetItem,
-    QHeaderView, QTabWidget
+    QHeaderView, QTabWidget, QGroupBox
 )
 from PyQt6.QtGui import QAction, QIcon, QTextCursor, QColor
 from PyQt6.QtCore import Qt, QSize
@@ -12,6 +14,7 @@ from PyQt6.QtCore import Qt, QSize
 from scanner import Scanner
 from parser import parse_tokens
 from ast_nodes import ASTPrinter
+from semantic import SemanticAnalyzer
 
 
 class TextEditor(QMainWindow):
@@ -20,6 +23,7 @@ class TextEditor(QMainWindow):
         self.current_file = None
         self.current_dir = None
         self.scanner = Scanner()
+        self.semantic = SemanticAnalyzer()
         self.init_ui()
         self.init_save_dir()
 
@@ -31,59 +35,74 @@ class TextEditor(QMainWindow):
         self.current_dir = self.default_dir
 
     def init_ui(self):
-        self.setWindowTitle("Лабораторная работа 3. Синтаксический анализатор [*]")
-        self.setGeometry(100, 100, 1400, 700)
+        self.setWindowTitle("Лабораторная работа 5. Семантический анализатор [*]")
+        self.setGeometry(100, 100, 1400, 750)
 
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
         layout = QVBoxLayout(central_widget)
         layout.setContentsMargins(0, 0, 0, 0)
 
-        main_splitter = QSplitter(Qt.Orientation.Vertical)
-        top_splitter = QSplitter(Qt.Orientation.Horizontal)
+        # === ВЕРХНЯЯ ЧАСТЬ: два редактора ===
+        top_widget = QWidget()
+        top_layout = QVBoxLayout(top_widget)
+        top_layout.setContentsMargins(5, 5, 5, 5)
 
-        # Область ввода
-        self.editor = QTextEdit()
-        self.editor.setPlaceholderText("Область ввода текста...")
-        self.editor.document().modificationChanged.connect(self.setWindowModified)
+        # Область для объявления переменных
+        decl_group = QGroupBox("Объявление переменных (int имя = значение;)")
+        decl_layout = QVBoxLayout(decl_group)
+        self.decl_editor = QTextEdit()
+        self.decl_editor.setPlaceholderText("int a = 5;\nint b = 10;\nint max;")
+        self.decl_editor.setMaximumHeight(120)
+        decl_layout.addWidget(self.decl_editor)
+        top_layout.addWidget(decl_group)
 
-        # Правая часть с вкладками
+        # Область для основного кода (if-else)
+        code_group = QGroupBox("Основной код (if-else конструкция)")
+        code_layout = QVBoxLayout(code_group)
+        self.code_editor = QTextEdit()
+        self.code_editor.setPlaceholderText("if (a > b) {\n    max = a;\n} else {\n    max = b;\n};")
+        code_layout.addWidget(self.code_editor)
+        top_layout.addWidget(code_group)
+
+        # === НИЖНЯЯ ЧАСТЬ: вкладки с результатами ===
         right_widget = QTabWidget()
         right_widget.setTabPosition(QTabWidget.TabPosition.North)
 
-        # Вкладка "Лексический анализатор"
         self.lexer_output = QTextEdit()
         self.lexer_output.setPlaceholderText("Вывод лексического анализатора...")
         self.lexer_output.setReadOnly(True)
         right_widget.addTab(self.lexer_output, "Лексический анализатор")
 
-        # Вкладка "Синтаксический анализатор"
         self.parser_output = QTextEdit()
         self.parser_output.setPlaceholderText("Вывод синтаксического анализатора...")
         self.parser_output.setReadOnly(True)
         right_widget.addTab(self.parser_output, "Синтаксический анализатор")
 
-        # Вкладка "AST (синтаксическое дерево)"
         self.ast_output = QTextEdit()
         self.ast_output.setPlaceholderText("Абстрактное синтаксическое дерево...")
         self.ast_output.setReadOnly(True)
         right_widget.addTab(self.ast_output, "AST (синтаксическое дерево)")
 
-        top_splitter.addWidget(self.editor)
-        top_splitter.addWidget(right_widget)
-        top_splitter.setSizes([700, 700])
+        self.semantic_output = QTextEdit()
+        self.semantic_output.setPlaceholderText("Семантические ошибки...")
+        self.semantic_output.setReadOnly(True)
+        right_widget.addTab(self.semantic_output, "Семантический анализатор")
 
-        # Нижняя область — таблица ошибок
+        # Таблица ошибок
         self.results_table = QTableWidget()
-        self.results_table.setColumnCount(3)
-        self.results_table.setHorizontalHeaderLabels(["Неверный фрагмент", "Местоположение", "Описание ошибки"])
+        self.results_table.setColumnCount(4)
+        self.results_table.setHorizontalHeaderLabels(["Неверный фрагмент", "Местоположение", "Описание ошибки", "Тип"])
         self.results_table.horizontalHeader().setStretchLastSection(True)
         self.results_table.setAlternatingRowColors(True)
         self.results_table.itemClicked.connect(self.on_table_item_clicked)
 
-        main_splitter.addWidget(top_splitter)
+        # Сплиттер
+        main_splitter = QSplitter(Qt.Orientation.Vertical)
+        main_splitter.addWidget(top_widget)
+        main_splitter.addWidget(right_widget)
         main_splitter.addWidget(self.results_table)
-        main_splitter.setSizes([500, 200])
+        main_splitter.setSizes([300, 400, 200])
 
         layout.addWidget(main_splitter)
 
@@ -91,11 +110,22 @@ class TextEditor(QMainWindow):
         self.create_toolbar()
         self.statusBar().showMessage("Готов к работе")
 
+    def get_full_code(self):
+        """Объединяет объявления переменных и основной код"""
+        decl_code = self.decl_editor.toPlainText().strip()
+        main_code = self.code_editor.toPlainText().strip()
+
+        if decl_code and main_code:
+            return decl_code + "\n\n" + main_code
+        elif decl_code:
+            return decl_code
+        else:
+            return main_code
+
     def create_menus(self):
         menubar = self.menuBar()
 
         file_menu = menubar.addMenu("Файл")
-
         self.new_action = QAction("Создать", self)
         self.new_action.setShortcut("Ctrl+N")
         self.new_action.triggered.connect(self.new_file)
@@ -117,55 +147,50 @@ class TextEditor(QMainWindow):
         file_menu.addAction(self.save_as_action)
 
         file_menu.addSeparator()
-
         exit_action = QAction("Выход", self)
         exit_action.setShortcut("Ctrl+Q")
         exit_action.triggered.connect(self.close)
         file_menu.addAction(exit_action)
 
         edit_menu = menubar.addMenu("Правка")
-
         self.undo_action = QAction("Отменить", self)
         self.undo_action.setShortcut("Ctrl+Z")
-        self.undo_action.triggered.connect(self.editor.undo)
+        self.undo_action.triggered.connect(lambda: self.code_editor.undo())
         edit_menu.addAction(self.undo_action)
 
         self.redo_action = QAction("Повторить", self)
         self.redo_action.setShortcut("Ctrl+Y")
-        self.redo_action.triggered.connect(self.editor.redo)
+        self.redo_action.triggered.connect(lambda: self.code_editor.redo())
         edit_menu.addAction(self.redo_action)
 
         edit_menu.addSeparator()
-
         self.cut_action = QAction("Вырезать", self)
         self.cut_action.setShortcut("Ctrl+X")
-        self.cut_action.triggered.connect(self.editor.cut)
+        self.cut_action.triggered.connect(lambda: self.code_editor.cut())
         edit_menu.addAction(self.cut_action)
 
         self.copy_action = QAction("Копировать", self)
         self.copy_action.setShortcut("Ctrl+C")
-        self.copy_action.triggered.connect(self.editor.copy)
+        self.copy_action.triggered.connect(lambda: self.code_editor.copy())
         edit_menu.addAction(self.copy_action)
 
         self.paste_action = QAction("Вставить", self)
         self.paste_action.setShortcut("Ctrl+V")
-        self.paste_action.triggered.connect(self.editor.paste)
+        self.paste_action.triggered.connect(lambda: self.code_editor.paste())
         edit_menu.addAction(self.paste_action)
 
         delete_action = QAction("Удалить", self)
         delete_action.setShortcut("Del")
-        delete_action.triggered.connect(lambda: self.editor.insertPlainText(""))
+        delete_action.triggered.connect(lambda: self.code_editor.insertPlainText(""))
         edit_menu.addAction(delete_action)
 
         edit_menu.addSeparator()
-
         select_all_action = QAction("Выделить все", self)
         select_all_action.setShortcut("Ctrl+A")
-        select_all_action.triggered.connect(self.editor.selectAll)
+        select_all_action.triggered.connect(lambda: self.code_editor.selectAll())
         edit_menu.addAction(select_all_action)
 
         text_menu = menubar.addMenu("Текст")
-
         text_items = [
             "Постановка задачи",
             "Грамматика",
@@ -175,7 +200,6 @@ class TextEditor(QMainWindow):
             "Список литературы",
             "Исходный код программы"
         ]
-
         for item_text in text_items:
             action = QAction(item_text, self)
             action.triggered.connect(lambda checked, text=item_text: self.show_text_info(text))
@@ -188,14 +212,12 @@ class TextEditor(QMainWindow):
         run_menu.addAction(self.run_action)
 
         help_menu = menubar.addMenu("Справка")
-
         self.help_action = QAction("Вызов справки", self)
         self.help_action.setShortcut("F1")
         self.help_action.triggered.connect(self.show_help)
         help_menu.addAction(self.help_action)
 
         help_menu.addSeparator()
-
         self.about_action = QAction("О программе", self)
         self.about_action.triggered.connect(self.show_about)
         help_menu.addAction(self.about_action)
@@ -224,37 +246,33 @@ class TextEditor(QMainWindow):
         toolbar.addAction(save_tb)
 
         toolbar.addSeparator()
-
         undo_tb = QAction(load_icon("undo.png"), "Отменить", self)
-        undo_tb.triggered.connect(self.editor.undo)
+        undo_tb.triggered.connect(lambda: self.code_editor.undo())
         toolbar.addAction(undo_tb)
 
         redo_tb = QAction(load_icon("redo.png"), "Повторить", self)
-        redo_tb.triggered.connect(self.editor.redo)
+        redo_tb.triggered.connect(lambda: self.code_editor.redo())
         toolbar.addAction(redo_tb)
 
         toolbar.addSeparator()
-
         cut_tb = QAction(load_icon("cut.png"), "Вырезать", self)
-        cut_tb.triggered.connect(self.editor.cut)
+        cut_tb.triggered.connect(lambda: self.code_editor.cut())
         toolbar.addAction(cut_tb)
 
         copy_tb = QAction(load_icon("copy.png"), "Копировать", self)
-        copy_tb.triggered.connect(self.editor.copy)
+        copy_tb.triggered.connect(lambda: self.code_editor.copy())
         toolbar.addAction(copy_tb)
 
         paste_tb = QAction(load_icon("paste.png"), "Вставить", self)
-        paste_tb.triggered.connect(self.editor.paste)
+        paste_tb.triggered.connect(lambda: self.code_editor.paste())
         toolbar.addAction(paste_tb)
 
         toolbar.addSeparator()
-
         run_tb = QAction(load_icon("run.png"), "Пуск", self)
         run_tb.triggered.connect(self.run_analyzer)
         toolbar.addAction(run_tb)
 
         toolbar.addSeparator()
-
         help_tb = QAction(load_icon("help.png"), "Справка", self)
         help_tb.triggered.connect(self.show_help)
         toolbar.addAction(help_tb)
@@ -265,9 +283,10 @@ class TextEditor(QMainWindow):
 
     def new_file(self):
         if self.maybe_save():
-            self.editor.clear()
+            self.decl_editor.clear()
+            self.code_editor.clear()
             self.current_file = None
-            self.setWindowTitle("Лабораторная работа 3. Синтаксический анализатор[*]")
+            self.setWindowTitle("Лабораторная работа 5. Семантический анализатор[*]")
             self.setWindowModified(False)
             self.clear_results()
             self.statusBar().showMessage("Новый файл создан")
@@ -282,10 +301,12 @@ class TextEditor(QMainWindow):
                 try:
                     with open(file_path, 'r', encoding='utf-8') as f:
                         content = f.read()
-                    self.editor.setPlainText(content)
+                    # Разделяем содержимое на объявления и код (упрощённо)
+                    self.decl_editor.setPlainText(content)
+                    self.code_editor.clear()
                     self.current_file = file_path
                     self.current_dir = os.path.dirname(file_path)
-                    self.setWindowTitle(f"{os.path.basename(file_path)} - Лабораторная работа 3[*]")
+                    self.setWindowTitle(f"{os.path.basename(file_path)} - Лабораторная работа 5[*]")
                     self.setWindowModified(False)
                     self.clear_results()
                     self.statusBar().showMessage(f"Файл загружен: {file_path}")
@@ -309,12 +330,12 @@ class TextEditor(QMainWindow):
 
     def _save_to_file(self, file_path):
         try:
+            full_code = self.get_full_code()
             with open(file_path, 'w', encoding='utf-8') as f:
-                f.write(self.editor.toPlainText())
+                f.write(full_code)
             self.current_file = file_path
             self.current_dir = os.path.dirname(file_path)
-            self.editor.document().setModified(False)
-            self.setWindowTitle(f"{os.path.basename(file_path)} - Лабораторная работа 3[*]")
+            self.setWindowTitle(f"{os.path.basename(file_path)} - Лабораторная работа 5[*]")
             self.setWindowModified(False)
             self.statusBar().showMessage(f"Файл сохранен: {file_path}")
             return True
@@ -323,7 +344,7 @@ class TextEditor(QMainWindow):
             return False
 
     def maybe_save(self):
-        if not self.editor.document().isModified():
+        if not self.code_editor.document().isModified() and not self.decl_editor.document().isModified():
             return True
         ret = QMessageBox.warning(
             self, "Сохранение",
@@ -349,6 +370,7 @@ class TextEditor(QMainWindow):
         self.parser_output.clear()
         self.lexer_output.clear()
         self.ast_output.clear()
+        self.semantic_output.clear()
 
     def _set_row_color(self, row, bg_color, fg_color):
         for col in range(self.results_table.columnCount()):
@@ -358,17 +380,17 @@ class TextEditor(QMainWindow):
                 item.setForeground(fg_color)
 
     def run_analyzer(self):
-        text = self.editor.toPlainText()
+        full_code = self.get_full_code()
 
-        if not text.strip():
+        if not full_code.strip():
             QMessageBox.information(self, "Анализатор", "Нет текста для анализа.")
             return
 
         self.clear_results()
 
-        tokens, lex_errors, filtered_text = self.scanner.scan(text)
+        tokens, lex_errors, filtered_text = self.scanner.scan(full_code)
 
-        # Заполняем вкладку лексера
+        # Лексический анализатор
         self.lexer_output.append("Результаты лексического анализа:")
         self.lexer_output.append(f"Токенов: {len(tokens)}")
 
@@ -388,7 +410,7 @@ class TextEditor(QMainWindow):
             for tok in tokens:
                 self.lexer_output.append(f"  [{tok.line}:{tok.start_pos}] {tok.type_desc}: '{tok.value}'")
 
-        # Синтаксический анализ с построением ASt
+        # Синтаксический анализатор
         syntax_errors = []
         parse_success = True
         ast = None
@@ -397,55 +419,76 @@ class TextEditor(QMainWindow):
             parse_success, syntax_errors, ast = parse_tokens(tokens, len(lex_errors) > 0)
         except Exception as e:
             self.parser_output.append(f"Ошибка парсера: {e}")
+            import traceback
+            traceback.print_exc()
 
-        # Заполняем вкладку парсера
-        total_errors = len(syntax_errors)
-
-        if total_errors == 0 and not lex_errors:
-            self.parser_output.append("Анализ успешно завершен. Ошибок не найдено.")
-        elif total_errors == 0 and lex_errors:
-            self.parser_output.append("Синтаксический анализ успешно завершен.")
-            self.parser_output.append(f"(Лексических ошибок: {len(lex_errors)})")
+        if parse_success and not syntax_errors:
+            self.parser_output.append("Синтаксический анализ успешно завершен. Ошибок не найдено.")
         else:
-            self.parser_output.append(f"Найдено синтаксических ошибок: {total_errors}")
-            self.parser_output.append("")
-            self.parser_output.append("Синтаксические ошибки:")
+            self.parser_output.append(f"Найдено синтаксических ошибок: {len(syntax_errors)}")
             for err in syntax_errors:
-                self.parser_output.append(
-                    f"  [{err.line}:{err.pos}] '{err.fragment}' — {err.message}"
-                )
+                self.parser_output.append(f"  [{err.line}:{err.pos}] '{err.fragment}' — {err.message}")
 
-        # Вывод AST
+        # AST
         self.ast_output.clear()
-        if ast and ast.children:
-            ast_text = ASTPrinter.print_ast(ast)
+        if ast and ast.nodes:
+            ast_text = ASTPrinter.print(ast)
             self.ast_output.append("Абстрактное синтаксическое дерево (AST)")
             self.ast_output.append("")
             self.ast_output.append(ast_text)
         elif ast:
-            ast_text = ASTPrinter.print_ast(ast)
+            ast_text = ASTPrinter.print(ast)
             self.ast_output.append("AST (частичный, с ошибками)")
             self.ast_output.append("")
             self.ast_output.append(ast_text)
         else:
             self.ast_output.append("AST не построен (синтаксические ошибки)")
 
-        # Таблица ошибок — только синтаксические
+        # Семантический анализатор
+        semantic_errors = []
+        if ast and parse_success and not lex_errors:
+            self.semantic_output.append("Семантический анализ")
+            self.semantic_output.append("")
+            semantic_errors = self.semantic.analyze(ast)
+            if semantic_errors:
+                self.semantic_output.append(f"Найдено семантических ошибок: {len(semantic_errors)}")
+                for err in semantic_errors:
+                    self.semantic_output.append(f"  [{err.line}:{err.pos}] '{err.fragment}' — {err.message}")
+            else:
+                self.semantic_output.append("Семантических ошибок не обнаружено.")
+        else:
+            self.semantic_output.append("Семантический анализ не выполнен (есть лексические или синтаксические ошибки)")
+
+        # Таблица ошибок
         all_rows = []
+        for err in lex_errors:
+            all_rows.append({
+                'fragment': err.get('char', '?'),
+                'line': err.get('line', 1),
+                'pos': err.get('pos_start', 1),
+                'message': err.get('message', ''),
+                'type': 'Лексическая'
+            })
         for err in syntax_errors:
             all_rows.append({
                 'fragment': err.fragment,
                 'line': err.line,
                 'pos': err.pos,
                 'message': err.message,
-                'is_lexical': False
+                'type': 'Синтаксическая'
+            })
+        for err in semantic_errors:
+            all_rows.append({
+                'fragment': err.fragment,
+                'line': err.line,
+                'pos': err.pos,
+                'message': err.message,
+                'type': 'Семантическая'
             })
 
         all_rows.sort(key=lambda r: (r['line'], r['pos']))
 
         self.results_table.setRowCount(len(all_rows))
-        syn_bg = QColor(255, 160, 160)
-        fg = QColor(0, 0, 0)
 
         for row, entry in enumerate(all_rows):
             location = f"строка {entry['line']}, позиция {entry['pos']}"
@@ -460,15 +503,28 @@ class TextEditor(QMainWindow):
             message_item = QTableWidgetItem(entry['message'])
             message_item.setFlags(message_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
 
+            type_item = QTableWidgetItem(entry['type'])
+            type_item.setFlags(type_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
+
             self.results_table.setItem(row, 0, fragment_item)
             self.results_table.setItem(row, 1, location_item)
             self.results_table.setItem(row, 2, message_item)
-            self._set_row_color(row, syn_bg, fg)
+            self.results_table.setItem(row, 3, type_item)
+
+            if entry['type'] == 'Лексическая':
+                bg = QColor(255, 255, 200)
+            elif entry['type'] == 'Синтаксическая':
+                bg = QColor(255, 200, 200)
+            else:
+                bg = QColor(200, 200, 255)
+            self._set_row_color(row, bg, QColor(0, 0, 0))
 
         self.results_table.resizeColumnsToContents()
         self.results_table.horizontalHeader().setStretchLastSection(True)
 
-        self.statusBar().showMessage(f"Анализ завершен. Синтаксических ошибок: {total_errors}", 5000)
+        self.statusBar().showMessage(
+            f"Анализ завершен. Ошибок: лекс={len(lex_errors)}, синт={len(syntax_errors)}, сем={len(semantic_errors)}",
+            5000)
 
     def on_table_item_clicked(self, item):
         row = item.row()
@@ -481,28 +537,36 @@ class TextEditor(QMainWindow):
         line = entry.get('line', 1)
         pos = entry.get('pos', 1)
         self.go_to_position(line, pos)
-        kind = "Лексическая" if entry.get('is_lexical') else "Синтаксическая"
-        self.statusBar().showMessage(f"{kind} ошибка: {entry.get('message', '')}", 3000)
+        self.statusBar().showMessage(f"{entry.get('type', 'Ошибка')}: {entry.get('message', '')}", 3000)
 
     def go_to_position(self, line, column):
-        cursor = self.editor.textCursor()
-        cursor.movePosition(QTextCursor.MoveOperation.Start)
-        if line > 1:
-            cursor.movePosition(QTextCursor.MoveOperation.Down, QTextCursor.MoveMode.MoveAnchor, line - 1)
-        if column > 1:
-            cursor.movePosition(QTextCursor.MoveOperation.Right, QTextCursor.MoveMode.MoveAnchor, column - 1)
-        cursor.movePosition(QTextCursor.MoveOperation.Right, QTextCursor.MoveMode.KeepAnchor, 1)
-        self.editor.setTextCursor(cursor)
-        self.editor.setFocus()
+        decl_code = self.decl_editor.toPlainText()
+        decl_lines = len(decl_code.split('\n')) if decl_code else 0
+
+        if line <= decl_lines:
+            cursor = self.decl_editor.textCursor()
+            cursor.movePosition(QTextCursor.MoveOperation.Start)
+            if line > 1:
+                cursor.movePosition(QTextCursor.MoveOperation.Down, QTextCursor.MoveMode.MoveAnchor, line - 1)
+            if column > 1:
+                cursor.movePosition(QTextCursor.MoveOperation.Right, QTextCursor.MoveMode.MoveAnchor, column - 1)
+            self.decl_editor.setTextCursor(cursor)
+            self.decl_editor.setFocus()
+        else:
+            cursor = self.code_editor.textCursor()
+            cursor.movePosition(QTextCursor.MoveOperation.Start)
+            new_line = line - decl_lines
+            if new_line > 1:
+                cursor.movePosition(QTextCursor.MoveOperation.Down, QTextCursor.MoveMode.MoveAnchor, new_line - 1)
+            if column > 1:
+                cursor.movePosition(QTextCursor.MoveOperation.Right, QTextCursor.MoveMode.MoveAnchor, column - 1)
+            self.code_editor.setTextCursor(cursor)
+            self.code_editor.setFocus()
 
     def show_text_info(self, title):
         if title == "Тестовый пример":
-            test_code = """if (a > b) {
-    max = a;
-} else {
-    max = b;
-};"""
-            self.editor.setPlainText(test_code)
+            self.decl_editor.setPlainText("int a = 5;\nint b = 10;\nint max;")
+            self.code_editor.setPlainText("if (a > b) {\n    max = a;\n} else {\n    max = b;\n};")
             self.statusBar().showMessage("Тестовый пример загружен в редактор", 3000)
             return
 
@@ -518,149 +582,53 @@ class TextEditor(QMainWindow):
         if title == "Постановка задачи":
             text_edit.setPlainText("""Постановка задачи
 
-Разработать лексический и синтаксический анализатор для конструкции if-else с блоком действий.
+Разработать лексический, синтаксический и семантический анализатор для конструкции if-else с блоком действий и объявлениями переменных.
 
-Язык должен поддерживать:
-1. Ключевые слова: if, else
-2. Логические операторы: and, or, not, &&, ||, !
-3. Операторы сравнения: >, <, >=, <=, ==, !=
-4. Арифметические операторы: +, -, *, /
-5. Присваивание: =
-6. Разделители: (, ), {, }, ;
-7. Идентификаторы и числа
-
-Пример корректной программы:
-if (a > b) {
-    max = a;
-} else {
-    max = b;
-};
-
-Задача: выделить все лексемы из входного текста и проверить синтаксическую правильность конструкции.""")
+Семантические проверки:
+1. Уникальность имён переменных
+2. Совместимость типов
+3. Допустимые значения (диапазон int)
+4. Использование объявленных переменных""")
         elif title == "Грамматика":
-            text_edit.setPlainText("""Грамматика G[START] для конструкции if-else
+            text_edit.setPlainText("""Грамматика G[START]
 
-G (<START >)
-1)<START> → "if" "(" <LOGICAL_EXP> ")" "{" <INSTR> "}" <ELSE_PART> ";"
-2)<ELSE_PART> → "else" "{" <INSTR> "}"
-3)<LOGICAL_EXP> → <COMPARE_EXP> <LOGICAL_EXP_TAIL>
-4)<LOGICAL_EXP_TAIL> → <LOGICAL_OP> <COMPARE_EXP> <LOGICAL_EXP_TAIL> | ε
-5)<LOGICAL_OP> → "&&" | "and" | "||" | "or"
-6)<NOT_OP> → "!" | "not"
-7)<COMPARE_EXP> → <NOT_OP> <COMPARE_EXP> | "(" <LOGICAL_EXP> ")" | <EXP>
-8)<EXP> → <id> <COMPARE> <id> | <id> <COMPARE> <num> | <num> <COMPARE> <id>
-9)<COMPARE> → ">" | "<" | ">=" | "<=" | "==" | "!="
-10)<INSTR> → <id> "=" <id> ";" | <id> "=" <num> ";"
-11)<id> → <letter> <ID_TAIL>
-12)<ID_TAIL> → <letter> <ID_TAIL> | <digit> <ID_TAIL> | ε
-13)<num> → <digit> <NUM_TAIL>
-14)<NUM_TAIL> → <digit> <NUM_TAIL> | ε
-15)<letter> → "a" | "b" | … | "z" | "A" | "B" | … | "Z"
-16)<digit> → "0" | "1" | … | "9"
+<START> → (<DECL> | <IF>)*
 
-Следуя введенному формальному определению грамматики, представим G[<START>] ее составляющими:
-Z = <START>
+<DECL> → "int" <id> ("=" <VALUE>)? ";"
 
-Vt = {
-    "(", ")", "{", "}", ";", ">", "<", "=", "!", "&", "|", 
-    "a", "b", "c", "d", "e", "f", "g", "h", "i",
-    "j", "k", "l", "m", "n", "o", "p", "q", "r",
-    "s", "t", "u", "v", "w", "x", "y", "z",
-    "A", "B", "C", "D", "E", "F", "G", "H", "I",
-    "J", "K", "L", "M", "N", "O", "P", "Q", "R",
-    "S", "T", "U", "V", "W", "X", "Y", "Z",
-    "0", "1", "2", "3", "4", "5", "6", "7", "8", "9"
-}
+<VALUE> → <num> | "true" | "false" | <id>
 
-Vn = {
-    <IF_construction>, <ELSE_PART>, <LOGICAL_EXP>, <LOGICAL_EXP_TAIL>,
-    <LOGICAL_OP>, <NOT_OP>, <COMPARE_EXP>, <EXP>, <COMPARE>,
-    <INSTR>, <id>, <ID_TAIL>, <num>, <NUM_TAIL>, <letter>, <digit>
-}
-""")
-        elif title == "Классификация грамматики":
-            text_edit.setPlainText("""Классификация грамматики по Хомскому
+<IF> → "if" "(" <LOGIC> ")" "{" <ASSIGN>* "}" ("else" "{" <ASSIGN>* "}")? ";"
 
-Данная грамматика относится к типу 2 (контекстно-свободная).
+<ASSIGN> → <id> "=" <VALUE> ";"
 
-Обоснование:
-1. Все правила имеют вид A -> alpha, где A - нетерминал, alpha - строка из терминалов и нетерминалов
-2. Отсутствуют контекстно-зависимые правила
-3. Грамматика содержит рекурсивные правила
+<LOGIC> → <COMPARE> (<LOGIC_OP> <COMPARE>)*
 
-Грамматика преобразована к LL(1)-виду (устранена левая рекурсия).""")
-        elif title == "Метод анализа":
-            text_edit.setPlainText("""Метод анализа
+<COMPARE> → <NOT>* <ATOM> (<COMPARE_OP> <ATOM>)?
 
-Для синтаксического анализа используется метод рекурсивного спуска.
+<ATOM> → <id> | <num> | "(" <LOGIC> ")"
 
-Особенности:
-1. Каждому нетерминалу грамматики соответствует своя функция
-2. Анализ выполняется слева направо (LL-анализ)
-3. Для восстановления после ошибок используется метод Айронса
-
-Метод Айронса:
-- При обнаружении ошибки парсер не останавливается
-- Ошибочный фрагмент пропускается до ближайшего синхронизирующего токена
-- Анализ продолжается с этого места""")
-        elif title == "Список литературы":
-            text_edit.setPlainText("""Список литературы
-
-1. Ахо А., Лам М., Сети Р., Ульман Д. Компиляторы: принципы, технологии и инструментарий. - 2-е изд. - М.: Вильямс, 2008. - 1175 с.
-2. Вирт Н. Построение компиляторов. - М.: ДМК Пресс, 2010. - 192 с.
-3. Грис Д. Конструирование компиляторов для цифровых вычислительных машин. - М.: Мир, 1975. - 544 с.
-4. Карпов Ю. Г. Теория автоматов. - СПб.: Питер, 2002. - 206 с.
-5. Шорников Ю. В. Теория языков программирования: проектирование и реализация. - Новосибирск: Изд-во НГТУ, 2022. - 290 с.
-6. Шорников Ю. В. Теория и практика языковых процессоров. - Новосибирск: Изд-во НГТУ, 2004. - 204 с.
-7. Свердлов С. З. Языки программирования и методы трансляции. - СПб.: Лань, 2019. - 564 с.
-8. Гордеев А. В., Молчанов А. Ю. Системное программное обеспечение. - СПб.: Питер, 2001. - 734 с.""")
-        elif title == "Исходный код программы":
-            text_edit.setPlainText("""Исходный код программы
-
-Программа состоит из следующих модулей:
-
-1. main.py - графический интерфейс пользователя (GUI)
-2. scanner.py - лексический анализатор
-3. parser.py - синтаксический анализатор
-
-Полный исходный код доступен в файлах проекта.""")
-
-        layout.addWidget(text_edit)
-        button_box = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok)
-        button_box.accepted.connect(dialog.accept)
-        layout.addWidget(button_box)
-        dialog.exec()
+<NOT> → "!" | "not"
+<LOGIC_OP> → "&&" | "and" | "||" | "or"
+<COMPARE_OP> → ">" | "<" | ">=" | "<=" | "==" | "!=" """)
 
     def show_help(self):
-        help_text = """
-        <h2>Руководство пользователя</h2>
-        <p><b>Меню "Файл":</b></p>
-        <ul>
-            <li><b>Создать (Ctrl+N)</b> - новый файл</li>
-            <li><b>Открыть (Ctrl+O)</b> - открыть файл</li>
-            <li><b>Сохранить (Ctrl+S)</b> - сохранить изменения</li>
-            <li><b>Сохранить как (Ctrl+Shift+S)</b> - сохранить в новый файл</li>
-            <li><b>Выход (Ctrl+Q)</b> - закрыть программу</li>
-        </ul>
-        <p><b>Меню "Правка":</b></p>
-        <ul>
-            <li><b>Отмена (Ctrl+Z), Повтор (Ctrl+Y)</b></li>
-            <li><b>Вырезать (Ctrl+X), Копировать (Ctrl+C), Вставить (Ctrl+V)</b></li>
-            <li><b>Удалить (Del), Выделить все (Ctrl+A)</b></li>
-        </ul>
-        <p><b>Меню "Пуск" (F5):</b> запускает оба анализатора.</p>
-        <p>Результаты выводятся в правой панели на вкладках "Синтаксический анализатор" и "Лексический анализатор".</p>
-        <p>Ошибки отображаются в нижней таблице.</p>
-        <p>Клик по строке таблицы перемещает курсор на позицию ошибки в редакторе.</p>
-        """
-        self.parser_output.setHtml(help_text)
-        self.lexer_output.setHtml(help_text)
+        help_text = """<h2>Руководство пользователя</h2>
+<p><b>Пуск (F5):</b> Запуск полного анализа</p>
+<p><b>Семантические проверки:</b></p>
+<ul>
+<li>Уникальность имён переменных</li>
+<li>Совместимость типов</li>
+<li>Диапазон int (-2147483648..2147483647)</li>
+<li>Использование объявленных переменных</li>
+</ul>"""
+        self.semantic_output.setHtml(help_text)
 
     def show_about(self):
         QMessageBox.about(
             self,
             "О программе",
-            "<b>Лабораторная работа 3</b><br>"
+            "<b>Лабораторная работа 5</b><br>"
             "<b>Автор:</b> Топоев Максим<br>"
             "<b>Группа:</b> АП-327<br>"
             "<b>Преподаватель:</b> Антонянц Егор Николаевич<br>"

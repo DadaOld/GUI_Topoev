@@ -1,12 +1,4 @@
-# scanner.py - ПОЛНЫЙ ФАЙЛ
-
-import re
-
-class TokenType:
-    SPACE = 0
-    TAB = 20
-    NEWLINE = 21
-
+# scanner.py - полная версия
 
 class Token:
     def __init__(self, code, type_desc, value, line, start_pos, end_pos):
@@ -34,22 +26,22 @@ class Scanner:
         self.keywords = {
             'if': (1, "ключевое слово if"),
             'else': (2, "ключевое слово else"),
-            'and': (23, "логическое и"),
-            'or': (24, "логическое или"),
-            'not': (25, "логическое не")
+            'int': (30, "тип int"),
+            'double': (31, "тип double"),
+            'boolean': (32, "тип boolean"),
+            'String': (33, "тип String"),
+            'true': (40, "логическое значение true"),
+            'false': (41, "логическое значение false")
         }
 
         self.symbols = {
             '=': (4, "оператор присваивания"),
-            '+': (11, "арифметический оператор +"),
-            '-': (12, "арифметический оператор -"),
-            '*': (13, "арифметический оператор *"),
-            '/': (14, "арифметический оператор /"),
             '(': (15, "открывающая скобка"),
             ')': (16, "закрывающая скобка"),
             '{': (17, "открывающая фигурная скобка"),
             '}': (18, "закрывающая фигурная скобка"),
-            ';': (19, "конец оператора")
+            ';': (19, "конец оператора"),
+            '"': (50, "кавычка")
         }
 
         self.two_char_operators = {
@@ -66,18 +58,6 @@ class Scanner:
             '<': (6, "оператор сравнения <")
         }
 
-        # Все допустимые символы языка (только ASCII)
-        self.ALLOWED_CHARS = set(
-            "abcdefghijklmnopqrstuvwxyz"
-            "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-            "0123456789_"
-            "=+-*/(){};<>!&|."
-        )
-
-    def is_valid_identifier_char(self, ch):
-        """Проверка символа для идентификатора (только латиница, цифры, _)"""
-        return ch.isascii() and (ch.isalnum() or ch == '_')
-
     def scan(self, text):
         tokens = []
         errors = []
@@ -92,25 +72,47 @@ class Scanner:
             ch = text[i]
             pos = i - line_start + 1
 
-            # Обработка переноса строки
             if ch == '\n':
                 line += 1
                 line_start = i + 1
                 i += 1
                 continue
 
-            # Пропуск пробелов и табуляций
             if ch in ' \t':
                 i += 1
                 continue
 
+            # Строковые литералы
+            if ch == '"':
+                start_line = line
+                start_pos = pos
+                value = '"'
+                i += 1
+                while i < n and text[i] != '"':
+                    value += text[i]
+                    i += 1
+                if i < n and text[i] == '"':
+                    value += '"'
+                    i += 1
+                else:
+                    errors.append({
+                        'line': line,
+                        'pos_start': start_pos,
+                        'pos_end': pos,
+                        'char': value,
+                        'message': "незакрытая строка"
+                    })
+                tokens.append(Token(51, "строковый литерал", value, start_line, start_pos, start_pos + len(value) - 1))
+                filtered_text += value
+                continue
+
             # Идентификаторы и ключевые слова
-            if ch.isascii() and (ch.isalpha() or ch == '_'):
+            if ch.isalpha() or ch == '_':
                 start_line = line
                 start_pos = pos
                 value = ""
 
-                while i < n and self.is_valid_identifier_char(text[i]):
+                while i < n and (text[i].isalnum() or text[i] == '_'):
                     value += text[i]
                     i += 1
 
@@ -122,23 +124,31 @@ class Scanner:
                 filtered_text += value
                 continue
 
-            # Числа
+            # Числа (целые и с плавающей точкой)
             if ch.isdigit():
                 start_line = line
                 start_pos = pos
                 value = ""
+                is_float = False
 
-                while i < n and text[i].isdigit():
+                while i < n and (text[i].isdigit() or text[i] == '.'):
+                    if text[i] == '.':
+                        if is_float:
+                            break
+                        is_float = True
                     value += text[i]
                     i += 1
 
-                tokens.append(Token(22, "целое число", value, start_line, start_pos, start_pos + len(value) - 1))
+                if is_float:
+                    tokens.append(Token(52, "число с плавающей точкой", value, start_line, start_pos, start_pos + len(value) - 1))
+                else:
+                    tokens.append(Token(22, "целое число", value, start_line, start_pos, start_pos + len(value) - 1))
                 filtered_text += value
                 continue
 
             # Двухсимвольные операторы
-            if i + 1 < n and text[i:i + 2] in self.two_char_operators:
-                two_chars = text[i:i + 2]
+            if i + 1 < n and text[i:i+2] in self.two_char_operators:
+                two_chars = text[i:i+2]
                 code, desc = self.two_char_operators[two_chars]
                 tokens.append(Token(code, desc, two_chars, line, pos, pos + 1))
                 filtered_text += two_chars
@@ -153,10 +163,9 @@ class Scanner:
                 i += 1
                 continue
 
-            # Логическое НЕ
             if ch == '!':
-                if i + 1 < n and text[i + 1] == '=':
-                    two_chars = text[i:i + 2]
+                if i + 1 < n and text[i+1] == '=':
+                    two_chars = text[i:i+2]
                     code, desc = self.two_char_operators[two_chars]
                     tokens.append(Token(code, desc, two_chars, line, pos, pos + 1))
                     filtered_text += two_chars
@@ -167,10 +176,9 @@ class Scanner:
                     i += 1
                 continue
 
-            # Логическое И (одиночный &)
             if ch == '&':
-                if i + 1 < n and text[i + 1] == '&':
-                    two_chars = text[i:i + 2]
+                if i + 1 < n and text[i+1] == '&':
+                    two_chars = text[i:i+2]
                     code, desc = self.two_char_operators[two_chars]
                     tokens.append(Token(code, desc, two_chars, line, pos, pos + 1))
                     filtered_text += two_chars
@@ -183,14 +191,12 @@ class Scanner:
                         'char': '&',
                         'message': "недопустимый символ '&'"
                     })
-                    filtered_text += '&'
                     i += 1
                 continue
 
-            # Логическое ИЛИ (одиночный |)
             if ch == '|':
-                if i + 1 < n and text[i + 1] == '|':
-                    two_chars = text[i:i + 2]
+                if i + 1 < n and text[i+1] == '|':
+                    two_chars = text[i:i+2]
                     code, desc = self.two_char_operators[two_chars]
                     tokens.append(Token(code, desc, two_chars, line, pos, pos + 1))
                     filtered_text += two_chars
@@ -203,11 +209,9 @@ class Scanner:
                         'char': '|',
                         'message': "недопустимый символ '|'"
                     })
-                    filtered_text += '|'
                     i += 1
                 continue
 
-            # Остальные операторы и разделители
             if ch in self.symbols:
                 code, desc = self.symbols[ch]
                 tokens.append(Token(code, desc, ch, line, pos, pos))
@@ -215,73 +219,13 @@ class Scanner:
                 i += 1
                 continue
 
-            # Недопустимый символ — собираем группу подряд идущих
-            error_start_line = line
-            error_start_pos = pos
-            error_chars = ""
-
-            while i < n:
-                next_ch = text[i]
-                # Останавливаемся на пробеле, переносе строки
-                if next_ch in ' \t\n':
-                    break
-                # Останавливаемся на любом допустимом символе
-                if next_ch in self.ALLOWED_CHARS:
-                    break
-                # Собираем недопустимый символ
-                error_chars += next_ch
-                i += 1
-
-            if error_chars:
-                errors.append({
-                    'line': error_start_line,
-                    'pos_start': error_start_pos,
-                    'pos_end': error_start_pos + len(error_chars) - 1,
-                    'char': error_chars,
-                    'message': f"недопустимые символы '{error_chars}'"
-                })
-                filtered_text += error_chars
+            errors.append({
+                'line': line,
+                'pos_start': pos,
+                'pos_end': pos,
+                'char': ch,
+                'message': f"недопустимый символ '{ch}'"
+            })
+            i += 1
 
         return tokens, errors, filtered_text
-
-    def get_table_data(self, tokens, errors):
-        data = []
-
-        for token in tokens:
-            data.append(token.to_dict())
-
-        for error in errors:
-            char = error['char']
-            pos_start = error.get('pos_start', 1)
-            pos_end = error.get('pos_end', pos_start)
-
-            data.append({
-                'code': -1,
-                'type_desc': 'ошибка',
-                'value': char,
-                'location': f"строка {error['line']}, {pos_start}-{pos_end}",
-                'line': error['line'],
-                'start': pos_start,
-                'end': pos_end,
-                'is_error': True,
-                'is_lexical': True,
-                'message': error['message']
-            })
-
-        return data
-
-
-if __name__ == "__main__":
-    scanner = Scanner()
-
-    test = "if (a > b) { max = a; } else { max = b; };"
-    print(f"Вход: {test}")
-    tokens, errors, filtered = scanner.scan(test)
-    print(f"Отфильтровано: {filtered}")
-    print("Токены:")
-    for t in tokens:
-        print(f"  {t.code:3d} | {t.type_desc:25} | '{t.value}'")
-    if errors:
-        print("Ошибки:")
-        for e in errors:
-            print(f"  строка {e['line']}, {e['pos_start']}-{e['pos_end']}: {e['message']}")
