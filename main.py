@@ -368,7 +368,7 @@ class TextEditor(QMainWindow):
 
         tokens, lex_errors, filtered_text = self.scanner.scan(text)
 
-        # === ЗАПОЛНЯЕМ ВКЛАДКУ ЛЕКСЕРА ===
+        # Заполняем вкладку лексера
         self.lexer_output.append("Результаты лексического анализа:")
         self.lexer_output.append(f"Токенов: {len(tokens)}")
 
@@ -388,7 +388,7 @@ class TextEditor(QMainWindow):
             for tok in tokens:
                 self.lexer_output.append(f"  [{tok.line}:{tok.start_pos}] {tok.type_desc}: '{tok.value}'")
 
-        # === СИНТАКСИЧЕСКИЙ АНАЛИЗ С ПОСТРОЕНИЕМ AST ===
+        # Синтаксический анализ с построением ASt
         syntax_errors = []
         parse_success = True
         ast = None
@@ -398,7 +398,7 @@ class TextEditor(QMainWindow):
         except Exception as e:
             self.parser_output.append(f"Ошибка парсера: {e}")
 
-        # === ЗАПОЛНЯЕМ ВКЛАДКУ ПАРСЕРА ===
+        # Заполняем вкладку парсера
         total_errors = len(syntax_errors)
 
         if total_errors == 0 and not lex_errors:
@@ -415,22 +415,22 @@ class TextEditor(QMainWindow):
                     f"  [{err.line}:{err.pos}] '{err.fragment}' — {err.message}"
                 )
 
-        # === ВЫВОД AST ===
+        # Вывод AST
         self.ast_output.clear()
         if ast and ast.children:
             ast_text = ASTPrinter.print_ast(ast)
-            self.ast_output.append("=== Абстрактное синтаксическое дерево (AST) ===")
+            self.ast_output.append("Абстрактное синтаксическое дерево (AST)")
             self.ast_output.append("")
             self.ast_output.append(ast_text)
         elif ast:
             ast_text = ASTPrinter.print_ast(ast)
-            self.ast_output.append("=== AST (частичный, с ошибками) ===")
+            self.ast_output.append("AST (частичный, с ошибками)")
             self.ast_output.append("")
             self.ast_output.append(ast_text)
         else:
             self.ast_output.append("AST не построен (синтаксические ошибки)")
 
-        # === ТАБЛИЦА ОШИБОК — только синтаксические ===
+        # Таблица ошибок — только синтаксические
         all_rows = []
         for err in syntax_errors:
             all_rows.append({

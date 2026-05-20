@@ -119,19 +119,19 @@ class Parser:
             start_line = tok.line
             start_pos = tok.start_pos
 
-        # ----- СЛУЧАЙ 1: программа пуста -----
+        # СЛУЧАЙ 1: программа пуста
         if not tok:
             self.add_error("Ожидается 'if'")
             self.parsing_stopped = True
             return None
 
-        # ----- СЛУЧАЙ 2: '(' или ';' -----
+        # СЛУЧАЙ 2: '(' или ';'
         if tok.code in {self.TOK_LPAREN, self.TOK_SEMICOLON}:
             self.add_error("Ожидается 'if'")
             self.parsing_stopped = True
             return None
 
-        # ----- СЛУЧАЙ 3: число -----
+        # СЛУЧАЙ 3: число
         if tok.code == self.TOK_NUM:
             self.add_error("Ожидается 'if'")
             while self.current():
@@ -141,7 +141,7 @@ class Parser:
                 if self.current() and self.current().code in {self.TOK_LBRACE, self.TOK_SEMICOLON, self.TOK_IF}:
                     break
 
-        # ----- СЛУЧАЙ 4: идентификатор -----
+        # СЛУЧАЙ 4: идентификатор
         if tok.code == self.TOK_ID:
             self.add_error("Ожидается 'if'")
             while self.current():
@@ -155,7 +155,7 @@ class Parser:
                 self.parsing_stopped = True
                 return None
 
-        # ----- Корректный 'if' -----
+        # Корректный 'if'
         if self.current() and self.current().code == self.TOK_IF:
             self.advance()
 
