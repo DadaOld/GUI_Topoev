@@ -1,3 +1,13 @@
+# parser.py - синтаксический анализатор с построением AST
+
+from typing import List, Optional, Tuple
+from ast_nodes import (
+    ASTNode, ProgramNode, IfNode, BlockNode, AssignmentNode,
+    IdentifierNode, NumberNode, LogicalExpNode, CompareExpNode,
+    CompareOpNode, LogicalOpNode, NotOpNode, ParenExpNode, ASTPrinter
+)
+
+
 class ParseError:
     def __init__(self, line, pos, fragment, message):
         self.line = line
@@ -40,6 +50,7 @@ class Parser:
         self.total_tokens = len(self.tokens)
         self.has_lexical_errors = has_lexical_errors
         self.parsing_stopped = False
+        self.in_error_recovery = False
 
     def current(self):
         if self.position < self.total_tokens:
@@ -80,44 +91,48 @@ class Parser:
             self.advance()
         return self.current() is not None
 
-    # <START> -> <IF_construction> <END>
-    def parse_start(self):
-        self.parse_if_construction()
+    # <START> -> <IF_construction>
+    def parse_start(self) -> ProgramNode:
+        program = ProgramNode()
 
         if self.parsing_stopped:
-            return
+            return program
 
-        # Проверяем завершающий ';'
-        if self.total_tokens > 0:
-            last = self.tokens[-1]
-            if last.code != self.TOK_SEMICOLON:
-                # Проверяем, не был ли ';' уже проверен в конце else-блока
-                # Если последний токен — '}', значит ';' отсутствует
-                # Если последний токен — ';', всё хорошо
-                pass  # Ошибка уже добавлена в блоке else
+        if_node = self.parse_if_construction()
+        if if_node:
+            program.add_child(if_node)
+
+        # Проверяем завершающий ';' (уже обработано в parse_if_construction)
+        return program
 
     # <IF_construction> -> if ( <LOGICAL_EXP> ) { <INSTR> } else { <INSTR> } ;
-    def parse_if_construction(self):
+    def parse_if_construction(self) -> Optional[IfNode]:
         if self.parsing_stopped:
-            return
+            return None
 
         tok = self.current()
+
+        # Сохраняем позицию для узла
+        start_line = 1
+        start_pos = 1
+        if tok:
+            start_line = tok.line
+            start_pos = tok.start_pos
 
         # ----- СЛУЧАЙ 1: программа пуста -----
         if not tok:
             self.add_error("Ожидается 'if'")
             self.parsing_stopped = True
-            return
+            return None
 
         # ----- СЛУЧАЙ 2: '(' или ';' -----
         if tok.code in {self.TOK_LPAREN, self.TOK_SEMICOLON}:
             self.add_error("Ожидается 'if'")
             self.parsing_stopped = True
-            return
+            return None
 
         # ----- СЛУЧАЙ 3: число -----
         if tok.code == self.TOK_NUM:
-            # Число перед '(' считаем испорченным if
             self.add_error("Ожидается 'if'")
             while self.current():
                 self.advance()
@@ -128,9 +143,7 @@ class Parser:
 
         # ----- СЛУЧАЙ 4: идентификатор -----
         if tok.code == self.TOK_ID:
-            # Любой идентификатор перед '(' считаем испорченным if
             self.add_error("Ожидается 'if'")
-            # Пропускаем все токены до '('
             while self.current():
                 self.advance()
                 if self.current() and self.current().code == self.TOK_LPAREN:
@@ -140,21 +153,20 @@ class Parser:
             else:
                 self.add_error("Ожидается 'if'")
                 self.parsing_stopped = True
-                return
+                return None
 
         # ----- Корректный 'if' -----
         if self.current() and self.current().code == self.TOK_IF:
             self.advance()
 
         # Проверяем '('
-        tok = self.current()
-        if tok and tok.code != self.TOK_LPAREN:
+        if self.current() and self.current().code != self.TOK_LPAREN:
             found_rparen = False
             for i in range(self.position, min(self.total_tokens, self.position + 5)):
-                if self.tokens[i].code == self.TOK_RPAREN:
+                if i < self.total_tokens and self.tokens[i].code == self.TOK_RPAREN:
                     found_rparen = True
                     break
-                if self.tokens[i].code in {self.TOK_LBRACE, self.TOK_SEMICOLON}:
+                if i < self.total_tokens and self.tokens[i].code in {self.TOK_LBRACE, self.TOK_SEMICOLON}:
                     break
 
             if found_rparen:
@@ -165,9 +177,12 @@ class Parser:
         else:
             self.match(self.TOK_LPAREN)
 
-        self.parse_logical_exp()
+        # Парсим условие
+        condition = self.parse_logical_exp()
+        if not condition:
+            condition = IdentifierNode(start_line, start_pos, "unknown")
 
-        # )
+        # Проверяем ')'
         if self.current() and self.current().code == self.TOK_RPAREN:
             self.advance()
             if self.current() and self.current().code == self.TOK_RPAREN:
@@ -178,21 +193,11 @@ class Parser:
             self.skip_to({self.TOK_LBRACE, self.TOK_SEMICOLON})
             self.match(self.TOK_LBRACE)
 
-        # {
-        has_lbrace = self.match(self.TOK_LBRACE)
-        if not has_lbrace:
-            self.add_error("Ожидается '{'")
-            # Пропускаем всё до '}' ИДИ 'else'
-            self.skip_to({self.TOK_RBRACE, self.TOK_ELSE})
-            # Если нашли '}', пропускаем её
-            if self.current() and self.current().code == self.TOK_RBRACE:
-                self.advance()
-        else:
-            self.parse_instr()
-            if not self.expect(self.TOK_RBRACE, "Ожидается '}'"):
-                self.skip_to({self.TOK_ELSE, self.TOK_SEMICOLON})
+        # Парсим then-блок
+        then_block = self.parse_block()
 
-        # else ОБЯЗАТЕЛЕН
+        # Парсим else-часть
+        else_block = None
         tok = self.current()
         has_else = False
 
@@ -209,230 +214,233 @@ class Parser:
             self.advance()
             has_else = True
 
-        if not has_else and tok and tok.code not in {self.TOK_ID, self.TOK_ELSE}:
+        if has_else:
+            else_block = self.parse_block()
+        elif tok and tok.code not in {self.TOK_ID, self.TOK_ELSE}:
             self.add_error("Ожидается 'else'")
 
-        # {
-        has_lbrace = self.match(self.TOK_LBRACE)
-        if not has_lbrace:
-            self.add_error("Ожидается '{'")
-            self.skip_to({self.TOK_ID, self.TOK_NUM, self.TOK_RBRACE})
-
-        # <INSTR>
-        if self.current() and self.current().code != self.TOK_RBRACE:
-            self.parse_instr()
-        elif has_lbrace:
-            self.add_error("Ожидается инструкция присваивания")
-
-        # }
-        has_rbrace = self.match(self.TOK_RBRACE)
-        if not has_rbrace:
-            self.add_error("Ожидается '}'")
-            if self.current() and self.current().code == self.TOK_SEMICOLON:
-                self.advance()
-
-        # ;
+        # Проверяем завершающую ';'
         if self.current() and self.current().code == self.TOK_SEMICOLON:
             self.advance()
         elif self.current():
             self.add_error("Ожидается ';'")
-        elif has_rbrace:
+        elif then_block:
             self.add_error("Ожидается ';'")
 
+        return IfNode(start_line, start_pos, condition, then_block, else_block)
+
     # <LOGICAL_EXP> -> <COMPARE_EXP> <LOGICAL_EXP_TAIL>
-    def parse_logical_exp(self):
+    def parse_logical_exp(self) -> Optional[ASTNode]:
         if self.parsing_stopped:
-            return
-        self.parse_compare_exp()
-        self.parse_logical_exp_tail()
+            return None
+
+        left = self.parse_compare_exp()
+        if not left:
+            return None
+
+        # Обрабатываем хвост (логические операторы)
+        while self.current() and self.current().code in self.LOGICAL_OPS:
+            op_token = self.current()
+            op_node = LogicalOpNode(op_token.line, op_token.start_pos, op_token.value)
+            self.advance()
+
+            right = self.parse_compare_exp()
+            if right:
+                left = LogicalExpNode(op_token.line, op_token.start_pos, left, op_node, right)
+            else:
+                self.add_error("Ожидается выражение после логического оператора")
+                break
+
+        return left
 
     # <LOGICAL_EXP_TAIL> -> <LOGICAL_OP> <COMPARE_EXP> <LOGICAL_EXP_TAIL> | eps
     def parse_logical_exp_tail(self):
-        if self.parsing_stopped:
-            return
-        if self.current() and self.current().code in self.LOGICAL_OPS:
-            self.advance()
-            tok = self.current()
-            if not tok or tok.code not in {self.TOK_ID, self.TOK_NUM, self.TOK_NOT, self.TOK_LPAREN}:
-                self.add_error("Ожидается выражение после логического оператора")
-                self.skip_to({self.TOK_RPAREN, self.TOK_LBRACE, self.TOK_SEMICOLON})
-                return
-            self.parse_compare_exp()
-            self.parse_logical_exp_tail()
+        # Этот метод больше не нужен, логика перенесена в parse_logical_exp
+        pass
 
     # <COMPARE_EXP> -> <NOT_OP> <COMPARE_EXP> | ( <LOGICAL_EXP> ) | <EXP>
-    def parse_compare_exp(self):
+    def parse_compare_exp(self) -> Optional[ASTNode]:
         if self.parsing_stopped:
-            return
+            return None
+
         tok = self.current()
         if not tok:
-            self.add_error("Неожиданный конец файла")
-            return
+            return None
 
+        # Обработка отрицания
         if tok.code == self.TOK_NOT:
+            not_line = tok.line
+            not_pos = tok.start_pos
             self.advance()
-            self.parse_compare_exp()
-            return
+            expr = self.parse_compare_exp()
+            return NotOpNode(not_line, not_pos, expr)
 
+        # Обработка скобок
         if tok.code == self.TOK_LPAREN:
             self.advance()
-            self.parse_logical_exp()
+            expr = self.parse_logical_exp()
             if not self.expect(self.TOK_RPAREN, "Ожидается ')'"):
                 self.skip_to({self.TOK_LBRACE, self.TOK_SEMICOLON, self.TOK_RPAREN})
-            return
+            return ParenExpNode(tok.line, tok.start_pos, expr)
 
-        self.parse_exp()
+        # Обработка простого выражения сравнения
+        return self.parse_exp()
 
     # <EXP> -> <id> <COMPARE> <id> | <id> <COMPARE> <num> | <num> <COMPARE> <id>
-    def parse_exp(self):
+    def parse_exp(self) -> Optional[CompareExpNode]:
         if self.parsing_stopped:
-            return
-        tok = self.current()
-        if not tok:
-            self.add_error("Неожиданный конец файла")
-            return
+            return None
 
-        if tok.code not in {self.TOK_ID, self.TOK_NUM}:
-            if tok.code in self.COMPARE_OPS:
-                # Случай 3: if ( > b) — нет первого операнда
-                self.add_error("Ожидается идентификатор или число")
-                self.in_error_recovery = True
-                self.skip_to({self.TOK_RPAREN, self.TOK_LBRACE, self.TOK_SEMICOLON})
-            elif tok.code == self.TOK_RPAREN:
-                # Случай 2: if ( ) — пустое выражение
+        start_tok = self.current()
+        if not start_tok:
+            return None
+
+        # Парсим левый операнд
+        left = self._parse_primary()
+        if not left:
+            if start_tok.code == self.TOK_RPAREN:
                 self.add_error("Ожидается выражение")
-                self.in_error_recovery = True
             else:
                 self.add_error("Ожидается идентификатор или число")
-            return
+            return None
 
-        first_is_num = (tok.code == self.TOK_NUM)
-        first_token = tok
-        self.advance()
-
-        tok = self.current()
-        if not tok:
-            self.add_error("Неожиданный конец файла")
-            return
-
-        if tok.code not in self.COMPARE_OPS:
-            if tok.code == self.TOK_RPAREN:
-                # Случай 1: if (a ) — нет оператора и второго операнда
+        # Проверяем оператор сравнения
+        if not self.current() or self.current().code not in self.COMPARE_OPS:
+            if self.current() and self.current().code == self.TOK_RPAREN:
                 self.add_error("Ожидается оператор сравнения")
                 self.add_error("Ожидается идентификатор или число")
-                self.in_error_recovery = True
             else:
                 self.add_error("Ожидается оператор сравнения")
                 self.skip_to({self.TOK_RPAREN, self.TOK_LBRACE, self.TOK_SEMICOLON})
-            return
+            return None
 
+        op_token = self.current()
+        op_node = CompareOpNode(op_token.line, op_token.start_pos, op_token.value)
         self.advance()
 
-        tok = self.current()
-        if not tok:
-            self.add_error("Неожиданный конец файла")
-            return
-
-        if tok.code not in {self.TOK_ID, self.TOK_NUM}:
+        # Парсим правый операнд
+        right = self._parse_primary()
+        if not right:
             self.add_error("Ожидается идентификатор или число")
-            if tok.code != self.TOK_RPAREN:
-                self.skip_to({self.TOK_RPAREN, self.TOK_LBRACE, self.TOK_SEMICOLON})
-            return
+            return None
 
-        second_is_num = (tok.code == self.TOK_NUM)
-
-        if first_is_num and second_is_num:
+        # Проверка: сравнение двух чисел недопустимо
+        if isinstance(left, NumberNode) and isinstance(right, NumberNode):
             self.add_error("Сравнение двух чисел недопустимо")
 
-        self.advance()
+        return CompareExpNode(start_tok.line, start_tok.start_pos, left, op_node, right)
+
+    def _parse_primary(self) -> Optional[ASTNode]:
+        """Парсит идентификатор или число"""
+        tok = self.current()
+        if not tok:
+            return None
+
+        if tok.code == self.TOK_ID:
+            node = IdentifierNode(tok.line, tok.start_pos, tok.value)
+            self.advance()
+            return node
+
+        if tok.code == self.TOK_NUM:
+            node = NumberNode(tok.line, tok.start_pos, tok.value)
+            self.advance()
+            return node
+
+        return None
 
     # <INSTR> -> <id> = <id> ; | <id> = <num> ;
-    def parse_instr(self):
+    def parse_instr(self) -> Optional[AssignmentNode]:
         if self.parsing_stopped:
-            return
-        tok = self.current()
-        if not tok or tok.code == self.TOK_RBRACE:
-            self.add_error("Ожидается инструкция присваивания")
-            return
+            return None
 
-        if tok.code != self.TOK_ID:
+        start_tok = self.current()
+        if not start_tok or start_tok.code == self.TOK_RBRACE:
+            self.add_error("Ожидается инструкция присваивания")
+            return None
+
+        if start_tok.code != self.TOK_ID:
             self.add_error("Ожидается идентификатор")
             self.skip_to({self.TOK_SEMICOLON, self.TOK_RBRACE})
             if self.current() and self.current().code == self.TOK_SEMICOLON:
                 self.advance()
-            return
+            return None
 
-        # Пропускаем идентификатор
-        id_token = tok
+        left = IdentifierNode(start_tok.line, start_tok.start_pos, start_tok.value)
         self.advance()
 
-        # Проверяем, не идёт ли сразу другой ID или NUM (испорченный идентификатор)
-        tok = self.current()
-        if tok and tok.code in {self.TOK_ID, self.TOK_NUM}:
+        # Проверяем, не идёт ли сразу другой ID или NUM
+        if self.current() and self.current().code in {self.TOK_ID, self.TOK_NUM}:
             self.add_error("Ожидается '='")
-            # Проверяем ';' перед тем как выйти
             self.skip_to({self.TOK_SEMICOLON, self.TOK_RBRACE})
             if self.current() and self.current().code == self.TOK_SEMICOLON:
                 self.advance()
-            else:
-                self.add_error("Ожидается ';'")
-            return
-
-        # Флаги для отслеживания найденных/отсутствующих частей
-        has_assign = False
-        has_value = False
-        has_semicolon = False
+            return None
 
         # Проверяем '='
-        tok = self.current()
-        if tok and tok.code == self.TOK_ASSIGN:
-            self.advance()
-            has_assign = True
-        else:
+        if not self.match(self.TOK_ASSIGN):
             self.add_error("Ожидается '='")
+            return None
 
-        # Проверяем значение (если был '=' или если продолжаем)
-        tok = self.current()
-        if tok and tok.code in {self.TOK_ID, self.TOK_NUM}:
-            self.advance()
-            has_value = True
-        elif tok and tok.code == self.TOK_SEMICOLON:
-            if has_assign or not has_assign:
+        # Парсим правую часть
+        right = self._parse_primary()
+        if not right:
+            if self.current() and self.current().code == self.TOK_SEMICOLON:
                 self.add_error("Ожидается значение")
-            self.advance()
-            return
-        elif tok and tok.code == self.TOK_RBRACE:
-            self.add_error("Ожидается значение")
-            self.add_error("Ожидается ';'")
-            return
-        else:
-            if tok:
-                self.add_error("Ожидается значение")
-                self.advance()
-            else:
+            elif self.current() and self.current().code == self.TOK_RBRACE:
                 self.add_error("Ожидается значение")
                 self.add_error("Ожидается ';'")
-                return
+            else:
+                self.add_error("Ожидается значение")
+            return None
 
         # Проверяем ';'
-        tok = self.current()
-        if tok and tok.code == self.TOK_SEMICOLON:
-            self.advance()
-            has_semicolon = True
-        else:
+        if not self.match(self.TOK_SEMICOLON):
             self.add_error("Ожидается ';'")
             self.skip_to({self.TOK_RBRACE, self.TOK_SEMICOLON})
             if self.current() and self.current().code == self.TOK_SEMICOLON:
                 self.advance()
 
-    def parse(self):
+        return AssignmentNode(start_tok.line, start_tok.start_pos, left, right)
+
+    # Парсит блок { <INSTR> }
+    def parse_block(self) -> Optional[BlockNode]:
+        start_tok = self.current()
+        if not start_tok:
+            return None
+
+        # Проверяем '{'
+        if not self.match(self.TOK_LBRACE):
+            self.add_error("Ожидается '{'")
+            self.skip_to({self.TOK_RBRACE, self.TOK_ELSE})
+            if self.current() and self.current().code == self.TOK_RBRACE:
+                self.advance()
+            return None
+
+        block = BlockNode(start_tok.line, start_tok.start_pos)
+
+        # Парсим инструкции внутри блока (может быть несколько)
+        while self.current() and self.current().code != self.TOK_RBRACE:
+            instr = self.parse_instr()
+            if instr:
+                block.add_instruction(instr)
+
+        # Проверяем '}'
+        if not self.match(self.TOK_RBRACE):
+            self.add_error("Ожидается '}'")
+            self.skip_to({self.TOK_ELSE, self.TOK_SEMICOLON})
+
+        return block
+
+    def parse(self) -> Tuple[bool, List[ParseError], Optional[ProgramNode]]:
         if not self.tokens and not self.has_lexical_errors:
-            return True, []
-        self.parse_start()
+            return True, [], ProgramNode()
+
+        ast = self.parse_start()
         success = len(self.errors) == 0 and not self.has_lexical_errors
-        return success, self.errors
+        return success, self.errors, ast
 
 
 def parse_tokens(tokens, has_lexical_errors=False):
+    """Основная функция для запуска парсера"""
     parser = Parser(tokens, has_lexical_errors)
     return parser.parse()

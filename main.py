@@ -11,6 +11,7 @@ from PyQt6.QtCore import Qt, QSize
 
 from scanner import Scanner
 from parser import parse_tokens
+from ast_nodes import ASTPrinter
 
 
 class TextEditor(QMainWindow):
@@ -50,17 +51,23 @@ class TextEditor(QMainWindow):
         right_widget = QTabWidget()
         right_widget.setTabPosition(QTabWidget.TabPosition.North)
 
-        # Вкладка "Парсер"
+        # Вкладка "Лексический анализатор"
+        self.lexer_output = QTextEdit()
+        self.lexer_output.setPlaceholderText("Вывод лексического анализатора...")
+        self.lexer_output.setReadOnly(True)
+        right_widget.addTab(self.lexer_output, "Лексический анализатор")
+
+        # Вкладка "Синтаксический анализатор"
         self.parser_output = QTextEdit()
         self.parser_output.setPlaceholderText("Вывод синтаксического анализатора...")
         self.parser_output.setReadOnly(True)
         right_widget.addTab(self.parser_output, "Синтаксический анализатор")
 
-        # Вкладка "Лексер"
-        self.lexer_output = QTextEdit()
-        self.lexer_output.setPlaceholderText("Вывод лексического анализатора...")
-        self.lexer_output.setReadOnly(True)
-        right_widget.addTab(self.lexer_output, "Лексический анализатор")
+        # Вкладка "AST (синтаксическое дерево)"
+        self.ast_output = QTextEdit()
+        self.ast_output.setPlaceholderText("Абстрактное синтаксическое дерево...")
+        self.ast_output.setReadOnly(True)
+        right_widget.addTab(self.ast_output, "AST (синтаксическое дерево)")
 
         top_splitter.addWidget(self.editor)
         top_splitter.addWidget(right_widget)
@@ -341,6 +348,7 @@ class TextEditor(QMainWindow):
         self.results_table.setRowCount(0)
         self.parser_output.clear()
         self.lexer_output.clear()
+        self.ast_output.clear()
 
     def _set_row_color(self, row, bg_color, fg_color):
         for col in range(self.results_table.columnCount()):
@@ -380,12 +388,13 @@ class TextEditor(QMainWindow):
             for tok in tokens:
                 self.lexer_output.append(f"  [{tok.line}:{tok.start_pos}] {tok.type_desc}: '{tok.value}'")
 
-        # === СИНТАКСИЧЕСКИЙ АНАЛИЗ ===
+        # === СИНТАКСИЧЕСКИЙ АНАЛИЗ С ПОСТРОЕНИЕМ AST ===
         syntax_errors = []
         parse_success = True
+        ast = None
 
         try:
-            parse_success, syntax_errors = parse_tokens(tokens, len(lex_errors) > 0)
+            parse_success, syntax_errors, ast = parse_tokens(tokens, len(lex_errors) > 0)
         except Exception as e:
             self.parser_output.append(f"Ошибка парсера: {e}")
 
@@ -405,6 +414,21 @@ class TextEditor(QMainWindow):
                 self.parser_output.append(
                     f"  [{err.line}:{err.pos}] '{err.fragment}' — {err.message}"
                 )
+
+        # === ВЫВОД AST ===
+        self.ast_output.clear()
+        if ast and ast.children:
+            ast_text = ASTPrinter.print_ast(ast)
+            self.ast_output.append("=== Абстрактное синтаксическое дерево (AST) ===")
+            self.ast_output.append("")
+            self.ast_output.append(ast_text)
+        elif ast:
+            ast_text = ASTPrinter.print_ast(ast)
+            self.ast_output.append("=== AST (частичный, с ошибками) ===")
+            self.ast_output.append("")
+            self.ast_output.append(ast_text)
+        else:
+            self.ast_output.append("AST не построен (синтаксические ошибки)")
 
         # === ТАБЛИЦА ОШИБОК — только синтаксические ===
         all_rows = []
