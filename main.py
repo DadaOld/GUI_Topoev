@@ -358,7 +358,6 @@ class TextEditor(QMainWindow):
 
         self.clear_results()
 
-        # Лексический анализ
         tokens, lex_errors, filtered_text = self.scanner.scan(text)
 
         # === ЗАПОЛНЯЕМ ВКЛАДКУ ЛЕКСЕРА ===
@@ -393,10 +392,13 @@ class TextEditor(QMainWindow):
         # === ЗАПОЛНЯЕМ ВКЛАДКУ ПАРСЕРА ===
         total_errors = len(syntax_errors)
 
-        if total_errors == 0:
+        if total_errors == 0 and not lex_errors:
             self.parser_output.append("Анализ успешно завершен. Ошибок не найдено.")
+        elif total_errors == 0 and lex_errors:
+            self.parser_output.append("Синтаксический анализ успешно завершен.")
+            self.parser_output.append(f"(Лексических ошибок: {len(lex_errors)})")
         else:
-            self.parser_output.append(f"Анализ завершен. Найдено синтаксических ошибок: {total_errors}")
+            self.parser_output.append(f"Найдено синтаксических ошибок: {total_errors}")
             self.parser_output.append("")
             self.parser_output.append("Синтаксические ошибки:")
             for err in syntax_errors:
@@ -404,7 +406,7 @@ class TextEditor(QMainWindow):
                     f"  [{err.line}:{err.pos}] '{err.fragment}' — {err.message}"
                 )
 
-        # === ТАБЛИЦА ОШИБОК (обе вкладки) ===
+        # === ТАБЛИЦА ОШИБОК — только синтаксические ===
         all_rows = []
         for err in syntax_errors:
             all_rows.append({
@@ -414,19 +416,10 @@ class TextEditor(QMainWindow):
                 'message': err.message,
                 'is_lexical': False
             })
-        for err in lex_errors:
-            all_rows.append({
-                'fragment': err.get('char', '?'),
-                'line': err.get('line', 1),
-                'pos': err.get('pos_start', 1),
-                'message': err.get('message', ''),
-                'is_lexical': True
-            })
 
         all_rows.sort(key=lambda r: (r['line'], r['pos']))
 
         self.results_table.setRowCount(len(all_rows))
-        lex_bg = QColor(255, 200, 200)
         syn_bg = QColor(255, 160, 160)
         fg = QColor(0, 0, 0)
 
@@ -446,14 +439,12 @@ class TextEditor(QMainWindow):
             self.results_table.setItem(row, 0, fragment_item)
             self.results_table.setItem(row, 1, location_item)
             self.results_table.setItem(row, 2, message_item)
-
-            bg = lex_bg if entry['is_lexical'] else syn_bg
-            self._set_row_color(row, bg, fg)
+            self._set_row_color(row, syn_bg, fg)
 
         self.results_table.resizeColumnsToContents()
         self.results_table.horizontalHeader().setStretchLastSection(True)
 
-        self.statusBar().showMessage(f"Анализ завершен. Всего ошибок: {len(all_rows)}", 5000)
+        self.statusBar().showMessage(f"Анализ завершен. Синтаксических ошибок: {total_errors}", 5000)
 
     def on_table_item_clicked(self, item):
         row = item.row()
@@ -525,24 +516,44 @@ if (a > b) {
         elif title == "Грамматика":
             text_edit.setPlainText("""Грамматика G[START] для конструкции if-else
 
-1) <START> -> <IF_construction> <END>
-2) <IF_construction> -> if ( <LOGICAL_EXP> ) { <INSTR> } <ELSE_PART> ;
-3) <ELSE_PART> -> else { <INSTR> } | eps
-4) <LOGICAL_EXP> -> <COMPARE_EXP> <LOGICAL_EXP_TAIL>
-5) <LOGICAL_EXP_TAIL> -> <LOGICAL_OP> <COMPARE_EXP> <LOGICAL_EXP_TAIL> | eps
-6) <LOGICAL_OP> -> && | and | || | or
-7) <NOT_OP> -> ! | not
-8) <COMPARE_EXP> -> <NOT_OP> <COMPARE_EXP> | ( <LOGICAL_EXP> ) | <EXP>
-9) <EXP> -> <id> <COMPARE> <id> | <id> <COMPARE> <num> | <num> <COMPARE> <id>
-10) <COMPARE> -> > | < | >= | <= | == | !=
-11) <INSTR> -> <id> = <id> ; | <id> = <num> ;
-12) <id> -> <letter> <ID_TAIL>
-13) <ID_TAIL> -> <letter> <ID_TAIL> | <digit> <ID_TAIL> | eps
-14) <num> -> <digit> <NUM_TAIL>
-15) <NUM_TAIL> -> <digit> <NUM_TAIL> | eps
-16) <letter> -> a | b | ... | z | A | B | ... | Z
-17) <digit> -> 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9
-18) <END> -> eps""")
+G (<START >)
+1)<START> → "if" "(" <LOGICAL_EXP> ")" "{" <INSTR> "}" <ELSE_PART> ";"
+2)<ELSE_PART> → "else" "{" <INSTR> "}"
+3)<LOGICAL_EXP> → <COMPARE_EXP> <LOGICAL_EXP_TAIL>
+4)<LOGICAL_EXP_TAIL> → <LOGICAL_OP> <COMPARE_EXP> <LOGICAL_EXP_TAIL> | ε
+5)<LOGICAL_OP> → "&&" | "and" | "||" | "or"
+6)<NOT_OP> → "!" | "not"
+7)<COMPARE_EXP> → <NOT_OP> <COMPARE_EXP> | "(" <LOGICAL_EXP> ")" | <EXP>
+8)<EXP> → <id> <COMPARE> <id> | <id> <COMPARE> <num> | <num> <COMPARE> <id>
+9)<COMPARE> → ">" | "<" | ">=" | "<=" | "==" | "!="
+10)<INSTR> → <id> "=" <id> ";" | <id> "=" <num> ";"
+11)<id> → <letter> <ID_TAIL>
+12)<ID_TAIL> → <letter> <ID_TAIL> | <digit> <ID_TAIL> | ε
+13)<num> → <digit> <NUM_TAIL>
+14)<NUM_TAIL> → <digit> <NUM_TAIL> | ε
+15)<letter> → "a" | "b" | … | "z" | "A" | "B" | … | "Z"
+16)<digit> → "0" | "1" | … | "9"
+
+Следуя введенному формальному определению грамматики, представим G[<START>] ее составляющими:
+Z = <START>
+
+Vt = {
+    "(", ")", "{", "}", ";", ">", "<", "=", "!", "&", "|", 
+    "a", "b", "c", "d", "e", "f", "g", "h", "i",
+    "j", "k", "l", "m", "n", "o", "p", "q", "r",
+    "s", "t", "u", "v", "w", "x", "y", "z",
+    "A", "B", "C", "D", "E", "F", "G", "H", "I",
+    "J", "K", "L", "M", "N", "O", "P", "Q", "R",
+    "S", "T", "U", "V", "W", "X", "Y", "Z",
+    "0", "1", "2", "3", "4", "5", "6", "7", "8", "9"
+}
+
+Vn = {
+    <IF_construction>, <ELSE_PART>, <LOGICAL_EXP>, <LOGICAL_EXP_TAIL>,
+    <LOGICAL_OP>, <NOT_OP>, <COMPARE_EXP>, <EXP>, <COMPARE>,
+    <INSTR>, <id>, <ID_TAIL>, <num>, <NUM_TAIL>, <letter>, <digit>
+}
+""")
         elif title == "Классификация грамматики":
             text_edit.setPlainText("""Классификация грамматики по Хомскому
 
